@@ -1,0 +1,61 @@
+# =============================================================================
+# BOAR Configuration File
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# General Options
+# -----------------------------------------------------------------------------
+general_options:
+  'clear_start': True     # [bool] Re-create output directory on start
+  'silent': True          # [bool] Suppress log messages
+  'log_dev': False        # [bool] Print all logs including simulation logs
+
+# -----------------------------------------------------------------------------
+# BASEMENT Options
+# -----------------------------------------------------------------------------
+basement_options:
+  'cleanup': False        # [bool] Remove previous results before running
+  'backend': omp          # [str] Backend: seq, omp, cuda, cudaC, cudaO
+  'nthreads': -1          # [int] Number of cores (-1 = all available)
+
+# -----------------------------------------------------------------------------
+# Simulation Options
+# -----------------------------------------------------------------------------
+simulation_options:
+  'discharge_file': True
+  'discharge_file_directory': _mock_support_files/discharge_files
+  'discharge_file_list': ['Q004.txt']
+
+# -----------------------------------------------------------------------------
+# Optimization Options
+# -----------------------------------------------------------------------------
+optimization_variable_options:
+  'initial_vector': file              # [str] file, float, or list
+  'regions': ['floodplain']           # [list] Regions to optimize
+  'constraints':                      # [dict] Parameter constraints
+    'expression': "x > y or np.isclose(x, y)"
+    'variables': ['x', 'y']
+  'bounds': [!!python/tuple [10, 60]] # [list] Optimization bounds
+  'precision': 1e-1                   # [float] Decimal precision
+  'save_errors': True                 # [bool] Save error points to CSV
+  'save_tried_vectors': False         # [bool] Save all results files
+  'in_house_optimization': False      # [bool] Use in-house optimizer
+
+# -----------------------------------------------------------------------------
+# Sampling Options
+# -----------------------------------------------------------------------------
+sampling_options:
+  'max_lhs_runs': 200                 # [int] Latin Hypercube samples
+  'seed': 42                          # [int] Random seed (None = random)
+
+# -----------------------------------------------------------------------------
+# Surrogate Model Options
+# -----------------------------------------------------------------------------
+surrogate_model_options:
+  'opt_mem_override': False           # [bool] Override memory check
+  'n_initial': 10                     # [int] Min samples before optimization
+  'max_tested_vectors': 50            # [int] Max vectors to try
+  'tolerance': 1e-4                   # [float] Stop criterion
+  'test_population': 67956            # [int] Surrogate model samples
+  'GPR_iterations': 500               # [int] Max GPR iterations
+  'max_no_improvement': 10            # [int] Max iterations without progress

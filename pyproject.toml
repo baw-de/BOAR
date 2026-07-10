@@ -1,0 +1,90 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "boar"
+version = "1.0.0"
+description = "Bayesian Optimization for Automated Roughness calibration in 2D hydrodynamic models"
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.10"
+dependencies = [
+    "h5py>=3.16.0",
+    "numpy>=2.4.5",
+    "openpyxl>=3.1.5",
+    "optuna>=4.8.0",
+    "pandas>=3.0.3",
+    "PyYAML>=6.0.3",
+    "scikit_learn>=1.8.0",
+    "scikit_optimize>=0.10.2",
+    "scipy>=1.17.1",
+    "torch>=2.12.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "bandit>=1.9.0",
+    "ruff>=0.5.0",
+    "mypy>=1.10.0",
+    "pip-audit>=2.7.0",
+    "pytest>=8.0.0",
+    "pytest-cov>=5.0.0",
+    "Sphinx>=9.1.0",
+    "SciencePlots>=2.2.1",
+    "matplotlib>=3.10.9",
+]
+
+# ── Ruff ─────────────────────────────────────────────────────────────────────
+[tool.ruff]
+target-version = "py310"
+line-length = 120
+exclude = [
+    "user_defined_configs",   # user-editable area, not part of the library
+    ".git",
+    "__pycache__",
+]
+
+[tool.ruff.lint]
+# Active rule sets:
+#   E/W  – pycodestyle errors & warnings
+#   F    – Pyflakes (unused imports, undefined names, …)
+#   I    – isort (import ordering)
+#   UP   – pyupgrade (modern Python idioms)
+select = ["E", "W", "F", "I", "UP"]
+
+ignore = [
+    # E402: imports after sys.path manipulation — unavoidable in this project layout
+    "E402",
+    # F402: loop variable shadows module import — benchmarks use `boar`/`optuna` as var names
+    "F402",
+    # UP009: UTF-8 coding comment — harmless, keep for clarity
+    "UP009",
+    # E501: line-length is enforced by the formatter (ruff format), not the linter
+    "E501",
+]
+
+[tool.ruff.lint.per-file-ignores]
+# docs/conf.py uses a test import to verify the package is importable
+"docs/conf.py" = ["F401"]
+# benchmark scripts need sys.path manipulation before imports
+"benchmarks/*.py" = ["E402", "F402"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+# ── mypy ─────────────────────────────────────────────────────────────────────
+[tool.mypy]
+python_version = "3.11"
+# Start lenient; tighten to --strict before v2.0
+warn_return_any = true
+warn_unused_configs = true
+ignore_missing_imports = true   # numpy, h5py, optuna etc. lack full stubs
+
+# ── pytest ────────────────────────────────────────────────────────────────────
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--tb=short --cov=src --cov=boar --cov-report=term-missing --cov-fail-under=0"
+python_files = ["test_*.py", "*_test.py"]
+python_functions = ["test_*"]

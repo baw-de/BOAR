@@ -10,13 +10,16 @@ from pathlib import Path
 module_path = Path(__file__).parent.parent
 sys.path.insert(0, str(module_path))
 
+import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import optuna
+import scienceplots  # noqa: F401  — registers matplotlib styles on import
 
 from src import bo_optimizer, functions_sampler, utils
 
 plt.style.use("science")
+matplotlib.use("Agg")
 
 
 def rosenbrock(x, a=1, b=100):
@@ -87,6 +90,7 @@ def run_boar_optimization(
             "max_tested_vectors": n_trials,
             "test_population": 100000,
             "seed": seed,
+            "GPR_alpha": 1e-10,
         },
     )
 

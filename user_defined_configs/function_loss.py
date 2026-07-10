@@ -17,7 +17,7 @@ from src import utils
 def loss_function(
     simulation_data: dict,
     ground_truth_data: dict,
-) -> float:
+) -> tuple[float, pd.DataFrame]:
     """
     Extracts simulation data at calibration points and computes the RMSE for water depth.
 
@@ -38,7 +38,7 @@ def loss_function(
     for ground_truth in ground_truth_data:
         # Create an empty array for simulated cross-section data
         gt_numpy = ground_truth.to_numpy()
-        sim_cs = {'cx':[], 'cy':[], 'h':[]}
+        sim_cs = {'cx':[], 'cy':[], 'h':[], 'ux':[], 'uy':[]}
 
         for i, (val_x, val_y, val_h) in enumerate(gt_numpy):
             # Find the closest simulation cells to the calibration point
@@ -49,7 +49,7 @@ def loss_function(
                 distance=True
             )
 
-            # Interpolate water depth using IDW (Inverse Distance Weighting)
+            # Interpolate flow variables using IDW (Inverse Distance Weighting)
             sim_h = simulation_data['hyd']['h'][closest_cell_ids]
             sim_ux = simulation_data['hyd']['ux'][closest_cell_ids]
             sim_uy = simulation_data['hyd']['uy'][closest_cell_ids]
@@ -63,7 +63,7 @@ def loss_function(
 
         # Checks for negative water depth
         if any(h < 0 for h in sim_cs['h']):
-            return 1e6
+            return 1e6, errors
 
         # Compute RMSE for this cross-section
         error_h = ground_truth['H [m]'] - sim_cs['h']

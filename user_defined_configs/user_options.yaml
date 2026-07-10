@@ -22,40 +22,43 @@ basement_options:
 # Simulation Options
 # -----------------------------------------------------------------------------
 simulation_options:
-  'discharge_file': True
-  'discharge_file_directory': _mock_support_files/discharge_files
-  'discharge_file_list': ['Q004.txt']
+  'discharge_file': True               # [bool] Define the model setup discharge using a TXT file. (Default: False)
+  'discharge_file_directory': /path/to/discharge_files # [str] Directory containing discharge files. Only required if 'discharge_file' is True.
+  'discharge_file_list': ['Q001.txt', 'Q002.txt']  # [list] List of discharge files to use. Only required if 'discharge_file' is True.
 
 # -----------------------------------------------------------------------------
 # Optimization Options
 # -----------------------------------------------------------------------------
 optimization_variable_options:
-  'initial_vector': file              # [str] file, float, or list
-  'regions': ['floodplain']           # [list] Regions to optimize
-  'constraints':                      # [dict] Parameter constraints
+  'initial_vector': file              # [str] file, float, or list. (Default: file)
+  'regions': ['main_channel', 'floodplain']           # [list] Regions to optimize. (Default: all friction regions)
+  'constraints':                      # [dict] Parameter constraints. (Default: None)
     'expression': "x > y or np.isclose(x, y)"
     'variables': ['x', 'y']
-  'bounds': [!!python/tuple [10, 60]] # [list] Optimization bounds
-  'precision': 1e-1                   # [float] Decimal precision
-  'save_errors': True                 # [bool] Save error points to CSV
-  'save_tried_vectors': False         # [bool] Save all results files
-  'in_house_optimization': False      # [bool] Use in-house optimizer
+  'bounds': [!!python/tuple [10, 60]] # [list of tuples] Optimization bounds. (Default: None)
+  'precision': 1e-1                   # [float] Decimal precision. (Default: 1)
+  'save_errors': True                 # [bool] Save error points to CSV. (Default: False)
+  'save_tried_vectors': False         # [bool] Save all results files. (Default: False)
+  'opt_engine': "boar"                # [str] Optimization engine ("boar" or "optuna"). Default: "boar"
 
 # -----------------------------------------------------------------------------
 # Sampling Options
 # -----------------------------------------------------------------------------
 sampling_options:
-  'max_lhs_runs': 200                 # [int] Latin Hypercube samples
   'seed': 42                          # [int] Random seed (None = random)
 
 # -----------------------------------------------------------------------------
 # Surrogate Model Options
 # -----------------------------------------------------------------------------
 surrogate_model_options:
-  'opt_mem_override': False           # [bool] Override memory check
-  'n_initial': 10                     # [int] Min samples before optimization
-  'max_tested_vectors': 50            # [int] Max vectors to try
   'tolerance': 1e-4                   # [float] Stop criterion
   'test_population': 67956            # [int] Surrogate model samples
-  'GPR_iterations': 500               # [int] Max GPR iterations
-  'max_no_improvement': 10            # [int] Max iterations without progress
+  'opt_mem_override': False           # [bool] Override memory check. (Default: False)
+  'n_initial': 5                      # [int] Min samples before optimization. (Default: 5)
+  'max_tested_vectors': 100           # [int] Max vectors to try. (Default: 100)
+  'max_no_improvement': 10            # [int] Max iterations without progress (Default: 100)
+  'GPR_iterations': 500               # [int] The number of restarts of the optimizer for finding the kernel’s parameters which maximize the log-marginal likelihood. (Default: 500)
+  'GPR_alpha': 1e-6                   # [float] Value added to the diagonal of the kernel matrix during fitting. This can prevent a potential numerical issue during fitting, by ensuring that the calculated values form a positive definite matrix. (Default: 1e-6)
+  'EI_exploration-exploitation': 0.01 # [float] Exploration-exploitation parameter for Expected Improvement acquisition function. (Default: 0.01)
+
+

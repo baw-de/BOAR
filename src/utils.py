@@ -31,8 +31,6 @@ import os
 from collections import defaultdict
 
 import numpy as np
-
-# Third-party imports
 import openpyxl
 
 
@@ -86,9 +84,6 @@ def modify_structured_array(arr, rename_dict=None, delete_cols=None):
                     if name == old_name:
                         new_dtype[i] = (new_name, type_)
                         name_mapping[new_name] = old_name  # Create mapping
-                # print(f"Renamed column '{old_name}' to '{new_name}'.")
-            # else:
-            # print(f"Column '{old_name}' not found; no renaming done for this column.")
 
     # Delete columns if delete_cols is provided
     if delete_cols:
@@ -96,9 +91,6 @@ def modify_structured_array(arr, rename_dict=None, delete_cols=None):
             if col in arr.dtype.names:
                 # Remove the column from the new dtype
                 new_dtype = [dt for dt in new_dtype if dt[0] != col]
-                # print(f"Deleted column '{col}'.")
-            # else:
-            # print(f"Column '{col}' not found; no deletion done for this column.")
 
     # Create new structured array with updated dtype
     new_arr = np.empty(arr.shape, dtype=new_dtype)
@@ -280,7 +272,6 @@ def create_constraint_function(expr: str, variables: list):
         ast.LtE,
         ast.Gt,
         ast.GtE,
-        ast.NameConstant,
         ast.Attribute,
         ast.Constant,
         # Arithmetic operations (BinOp)
@@ -295,6 +286,10 @@ def create_constraint_function(expr: str, variables: list):
         ast.UAdd,
         ast.USub,  # Unary operations
     }
+
+    # Python < 3.14 compatibility: include deprecated ast.NameConstant when present.
+    if hasattr(ast, "NameConstant"):
+        allowed_nodes.add(ast.NameConstant)
 
     # Walk through the AST and validate nodes
     for node in ast.walk(parsed_expr):

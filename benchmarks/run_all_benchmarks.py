@@ -23,7 +23,9 @@ def run_all() -> None:
             main_functions.append(main)
 
     with ProcessPoolExecutor() as executor:
-        list(executor.map(lambda fn: fn(), main_functions))
+        futures = [executor.submit(fn) for fn in main_functions]
+        for future in futures:
+            future.result()
 
 
 if __name__ == "__main__":

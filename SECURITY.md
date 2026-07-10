@@ -30,7 +30,7 @@ We will acknowledge receipt within **5 business days** and aim to provide a fix 
 
 ## Scope
 
-BOAR is a scientific calibration tool intended to be run in trusted, local or HPC environments.  
+BOAR is a scientific calibration tool intended to be run in trusted, local or HPC environments.
 The following areas are most relevant from a security perspective:
 
 | Area | Notes |

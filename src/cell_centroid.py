@@ -21,7 +21,7 @@ logger = logging.getLogger("cell_centroid")
 
 def calculate_centroids(
     mesh: dict, mesh_name: str, output_dir: str = "config", main_args: dict | None = None
-) -> np.ndarray:
+) -> pd.DataFrame:
     """
     Calculate the centroid of each cell in a loaded 2D mesh.
 
@@ -32,7 +32,7 @@ def calculate_centroids(
         main_args (dict): Additional arguments for file saving.
 
     Returns:
-        np.ndarray: Structured array containing element IDs and their centroids.
+        pd.DataFrame: DataFrame containing cell IDs and their corresponding centroids (cx, cy, cz).
     """
     # Ensure output directory exists
     os.makedirs(output_dir, exist_ok=True)
@@ -59,7 +59,7 @@ def calculate_centroids(
     return centroids
 
 
-def main(data: dict, paths: str, user_opts: dict) -> dict:
+def main(data: dict, paths: dict[str, str], user_opts: dict) -> dict:
     """
     Calculate the centroids of the cells in the mesh.
 

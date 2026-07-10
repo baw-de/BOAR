@@ -2,7 +2,8 @@ Benchmark Functions
 ===================
 
 This page documents the benchmark tests used to validate the BOAR optimization framework.
-Two classic optimization test functions are used: **Ackley** and **Rosenbrock**.
+Two classic optimization test functions are used: **Ackley** and **Rosenbrock**. Followed by a constrained version of each function to demonstrate the framework's ability to handle constraints.
+Lastly a **BASEMENT** benchmark is included to demonstrate the framework's ability to handle a two-dimensional hydrodynamic models calibration.
 
 .. contents::
    :local:
@@ -252,3 +253,60 @@ The feasible region is the entire domain **outside** the circle.
    :alt: Constrained Rosenbrock search history
 
    **Figure 16:** Search history of BOAR optimization on the 2D constrained Rosenbrock function.
+
+Compound Channel Benchmark (BASEMENT v4.2)
+------------------------------------------
+
+A compound channel benchmark is included to demonstrate the framework's ability to handle a two-dimensional hydrodynamic models calibration. The compound channel was divided into three friction zones (main channel, floodplain, and floodplain forest), each with a different Strickler's roughness coefficient (Figure 17). The search space for the optimization had 1 dimension (overbank flow), 2 dimensions (main channel and floodplain), 3 dimensions (main channel, floodplain, and floodplain forest), and additional 6-dimensional case was considered, at which the floodplain forest was divided into 4 zones.
+The goal of the optimization is to calibrate these coefficients to match observed water levels and flow rates.
+
+.. figure:: _static/images/basement_compound_channel/fig_numerical_model_6_regions.svg
+   :width: 600
+   :alt: Numerical simulations domain and boundary conditions.
+
+   **Figure 17:** Numerical simulations domain and boundary conditions. (a) For all Bare and Forest scenarions, and (b) artificial dim = 6 scenario  applied to the Mid vegetation. Each colour represents a hydraulic roughness region
+
+The loss is computed in terms of the Root Mean Square Error (RMSE) between the observed and simulated water levels and flow rates, normalized by the main channel flow depth. The following conditions were used for the optimization:
+
+.. code-block:: yaml
+
+    optimization_variable_options:
+      'bounds': [!!python/tuple [20, 60], !!python/tuple [20, 60], !!python/tuple [10, 35]] # Main channel, Floodplain, Floodplain Forest
+      'constraints':
+        'expression': "z < x and z < y"  # Floodplain Forest < Main channel and Floodplain
+        'variables': ['x', 'y', 'z']
+      'precision': 0.1
+      'n_initial': 5
+
+    surrogate_model_options:
+      'max_tested_vectors': 100
+      'max_no_improvement': 100
+      'tolerance': 1e-4
+      'GPR_iterations': 500
+      'test_population': 80200
+
+    sampling_options:
+      'seed': 9
+
+The following results were obtained for the BASEMENT benchmark using the BOAR engine:
+
+.. figure:: _static/images/basement_compound_channel/boar_figure_convergence_log.svg
+   :width: 600
+   :alt: Compound channel calibration
+
+   **Figure 18:** Calibration-convergence analysis based on the normalized :math:`\mathrm{RMSE}/H_{mc}`: (a) best loss value (%) versus trial number; (b) loss-value trajectories for the *Bare* and *Early* cases at the trials highlighted by arrows in panel (a). The dashed line in panel (a) denotes the median number of trials required to obtain the optimal loss, and the black markers in panel (b) indicate the corresponding optimal solution. The shaded light gray area represents the initial training phase. All simulations were performed on a Froude-scaled model at a 1:1 prototype scale.
+
+Note that the convergence is highly tied to the desired tolerance. For instance, if the tolerance is increased to 1.5%, the convergence is achieved in fewer trials (median = 9 trials), as shown in Figure 19.
+
+.. figure:: _static/images/basement_compound_channel/boar_figure_threshold_1.5percent.svg
+   :width: 600
+   :alt: Compound channel calibration with an increased tolerance
+
+   **Figure 19:** Calibration-convergence analysis based on the normalized :math:`\mathrm{RMSE}/H_{mc}` (Loss) versus trial number, with an error threshold of :math:`\mathrm{Loss}/H_{mc} \leq 1.5\%`. The shaded light gray area represents the initial training phase. All simulations were performed on a Froude-scaled model at a 1:1 prototype scale.
+
+For a more in depth information about the compound channel benchmark, please check de Oliveira et al. (2026) [1]_.
+
+References
+----------
+
+.. [1] LED. de Oliveira, MJ. Franca, NP. Huber, D. Vanzo, *BOAR: Bayesian Optimization for Automated Roughness calibration in two-dimensional hydrodynamic models*. SoftwareX, (under review)

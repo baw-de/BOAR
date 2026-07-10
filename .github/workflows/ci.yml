@@ -1,0 +1,224 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# BOAR – GitHub Actions CI
+# Quality gates for open-source publication
+#
+# Job order (each needs the previous):
+#   security ─► lint ─► typecheck ─► dependency-audit ─► test ─► deploy-docs
+# ─────────────────────────────────────────────────────────────────────────────
+name: BOAR CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# Cancel superseded runs on the same ref (mirrors sensible CI hygiene)
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  # ═══════════════════════════════════════════════════════════════════════════
+  # STAGE 1 – security  (Bandit → SARIF → GitHub Security tab)
+  # ═══════════════════════════════════════════════════════════════════════════
+  security:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write        # write code scanning results
+      actions: read                 # read the workflow run (fixes the "workflow-runs" error)
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ./.github/actions/setup-python-env
+
+      - name: Bandit scan (SARIF for Security tab)
+        run: |
+          # -ll : medium + high only ; keep going so SARIF always uploads
+          bandit -r . -ll --format sarif -o bandit.sarif || true
+
+      - name: Human-readable summary
+        run: bandit -r . -ll        # this line fails the job on findings
+
+      - name: Upload SARIF to Security tab
+        if: ${{ hashFiles('bandit.sarif') != '' }}
+        continue-on-error: true
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: bandit.sarif
+          category: bandit
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: bandit-sarif
+          path: bandit.sarif
+          retention-days: 30
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # STAGE 2 – lint  (Ruff → inline PR annotations via reviewdog)
+  # ═══════════════════════════════════════════════════════════════════════════
+  lint:
+    needs: [security]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write                 # reviewdog check runs
+      pull-requests: write          # inline PR comments
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ./.github/actions/setup-python-env
+
+      # GitHub-native annotations: ruff's github format emits ::error:: lines
+      # that appear inline on the PR "Files changed" tab automatically.
+      - name: Ruff check (annotations)
+        run: ruff check . --output-format=github
+
+      - name: Ruff format check
+        if: always()
+        run: ruff format --check .
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # STAGE 3 – typecheck
+  # ═══════════════════════════════════════════════════════════════════════════
+  typecheck:
+    needs: [security]
+    runs-on: ubuntu-latest
+    continue-on-error: true          # was: allow_failure: true
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ./.github/actions/setup-python-env
+      - run: mypy src/ boar.py
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # STAGE 4 – dependency-audit
+  # ═══════════════════════════════════════════════════════════════════════════
+  dependency-audit:
+    needs: [security]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ./.github/actions/setup-python-env
+      - name: pip-audit (JSON artifact)
+        run: pip-audit -r requirements.txt --output pip-audit-report.json --format json || true
+      - name: pip-audit (summary, fails on CVEs)
+        run: pip-audit -r requirements.txt
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: pip-audit-report
+          path: pip-audit-report.json
+          retention-days: 30
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # STAGE 5 – test  (pytest → coverage.xml → Codecov)
+  # ═══════════════════════════════════════════════════════════════════════════
+  test:
+    needs: [security, lint, typecheck, dependency-audit]
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    strategy:
+      fail-fast: false                       # let all versions run even if one fails
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
+    name: test (py${{ matrix.python-version }})
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ./.github/actions/setup-python-env
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Run pytest with coverage
+        run: pytest --cov-report=xml:coverage.xml
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: coverage.xml
+          fail_ci_if_error: false
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: coverage-xml-py${{ matrix.python-version }}   # unique name per version
+          path: coverage.xml
+          retention-days: 30
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # STAGE 6 – deploy-docs (GitHub Pages)
+  # ═══════════════════════════════════════════════════════════════════════════
+  docs-build:
+    needs: [test]
+    if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install sphinx sphinx-rtd-theme
+          pip install -r requirements.txt
+
+      - name: Clean old builds
+        run: |
+          rm -rf docs/_build
+          rm -rf docs/source
+
+      - name: Create directories
+        run: |
+          mkdir -p docs/_build
+          mkdir -p docs/source
+
+      - name: Generate API documentation
+        run: sphinx-apidoc -f -o docs/source/ . --separate
+
+      - name: Generate YAML docs
+        working-directory: ./
+        run: python docs/generate_docs.py
+
+      - name: Build documentation
+        run: sphinx-build -b html docs docs/_build/html
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs/_build/html
+
+  docs-deploy:
+    needs: [docs-build]
+    if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

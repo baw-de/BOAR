@@ -1,6 +1,6 @@
 # Contributing to BOAR
 
-Thank you for your interest in contributing to **BOAR** (Bayesian Optimization for Automated Roughness calibration)!  
+Thank you for your interest in contributing to **BOAR** (Bayesian Optimization for Automated Roughness calibration)!
 Contributions of any kind are welcome — bug reports, feature requests, documentation improvements, and code changes.
 
 ---
@@ -22,7 +22,7 @@ Contributions of any kind are welcome — bug reports, feature requests, documen
 
 ## Code of Conduct
 
-Please be respectful and constructive in all interactions.  
+Please be respectful and constructive in all interactions.
 We expect contributors to adhere to basic open-source community norms: be inclusive, patient, and collaborative.
 
 ---
@@ -129,7 +129,7 @@ ruff check .          # lint
 ruff format .         # auto-format
 ```
 
-Configuration lives in `pyproject.toml` under `[tool.ruff]`.  
+Configuration lives in `pyproject.toml` under `[tool.ruff]`.
 Line length is **120 characters**.
 
 ### Type Checking — `mypy`

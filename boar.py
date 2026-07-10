@@ -29,7 +29,6 @@ import logging
 import sys
 from pathlib import Path
 
-# Third-party imports
 import yaml
 
 # Import Basement-Calibrator modules
@@ -88,7 +87,7 @@ def main(logger_filename: str = "boar.log") -> None:
     """
     # Load configuration file
     with open(r"user_defined_configs/user_options.yaml") as file:
-        user_opt = yaml.safe_load(file)
+        user_opt = yaml.full_load(file)
 
     # Setup logger
     logger = setup_logger(logger_filename)
@@ -108,7 +107,7 @@ def main(logger_filename: str = "boar.log") -> None:
     data = cell_centroid.main(data, dict_paths, user_opt)
 
     # Optimize the friction region
-    data = friction_calibration.main(data, dict_paths, user_opt)
+    friction_calibration.main(data, dict_paths, user_opt)
 
     logger.info("Main function finished")
 

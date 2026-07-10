@@ -1,6 +1,8 @@
 # BOAR: Bayesian Optimization for Automated Roughness calibration in two-dimensional hydrodynamic models
 
-📖 **Documentation** — build locally with Sphinx (see [Building the docs](#building-the-docs) below) · Quickstart · Installation · Configuration · API Reference
+**Documentation** — build locally with Sphinx (see [Building the docs](#building-the-docs) below) · Quickstart · Installation · Configuration · API Reference
+
+Also available at: https://baw-de.github.io/BOAR/
 
 BOAR is a tool for automating the calibration of roughness parameters in two-dimensional hydrodynamic models using Bayesian Optimization. The project is designed to reduce manual trial-and-error during model calibration and support more efficient, reproducible parameter estimation workflows.
 
@@ -30,7 +32,7 @@ BOAR requires **Python ≥ 3.10** and a working installation of **BASEMENT v4.2*
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/<org>/boar.git
+git clone https://github.com/baw-de/boar.git
 cd boar
 
 # 2. Create and activate a virtual environment
@@ -46,11 +48,12 @@ For development (linting, tests, docs):
 pip install -e ".[dev]"
 ```
 
-> 📖 For a step-by-step walkthrough including BASEMENT setup, build the docs locally and open `docs/_build/html/quickstart.html` and `docs/_build/html/installation.html` — see [Building the docs](#building-the-docs) below.
+> For a step-by-step walkthrough including BASEMENT setup, build the docs locally and open `docs/_build/html/quickstart.html` and `docs/_build/html/installation.html` — see [Building the docs](#building-the-docs) below.
+> Alternatively check the online documentation pages at: https://baw-de.github.io/BOAR/quickstart.html and https://baw-de.github.io/BOAR/installation.html
 
 ## Configuration
 
-All user-facing settings live in [`user_defined_configs/user_options.yaml`](user_defined_configs/user_options.yaml).  
+All user-facing settings live in [`user_defined_configs/user_options.yaml`](user_defined_configs/user_options.yaml).
 Edit this file before running BOAR. The key sections are:
 
 | Section | What to configure |
@@ -62,8 +65,9 @@ Edit this file before running BOAR. The key sections are:
 | `sampling_options` | Number of Latin Hypercube samples, random seed |
 | `surrogate_model_options` | GPR iterations, stopping tolerances, max evaluations |
 
-> See the inline comments in `user_options.yaml` for a description of every option.  
-> 📖 For a full parameter reference, build the docs and open `optimization_configuration.html` and `loss_function.html`.
+> See the inline comments in `user_options.yaml` for a description of every option.
+> For a full parameter reference, build the docs and open `optimization_configuration.html` and `loss_function.html`.
+> Or: https://baw-de.github.io/BOAR/optimization_configuration.html and https://baw-de.github.io/BOAR/loss_function.html
 
 ## Running BOAR
 
@@ -149,4 +153,3 @@ Vanzo, D., Peter, S., Vonwiller, L., Bürgler, M., Weberndorfer, M., Siviglia, A
 
 <a id="2">[2]</a>
 Vetsch, D.F., Frei, S., Halso, M.C., Schierjott, J.C., Bürgler, M., Vanzo, D., 2024. Basement V4—A Multipurpose Modelling Environment for Simulation of Flood Hazards and River Morphodynamics Across Scales, in: Gourbesville, P., Caignaert, G. (Eds.), Advances in Hydroinformatics—SimHydro 2023 Volume 1. Springer Nature, Singapore, pp. 125–138. https://doi.org/10.1007/978-981-97-4072-7_8
-

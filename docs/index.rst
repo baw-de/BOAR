@@ -20,8 +20,6 @@ functions.
    loss_function
    benchmarks
    source/modules
-   source/src
-   source/user_defined_configs
 
 
 Indices and tables

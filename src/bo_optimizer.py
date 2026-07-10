@@ -32,8 +32,6 @@ from skopt.acquisition import gaussian_ei
 # Import Basement-Calibrator modules
 from src import utils
 
-# Import user defined functions
-
 
 class BayesianOptimizer:
     """
@@ -84,17 +82,19 @@ class BayesianOptimizer:
         # Initialize the kernel
         self.sample, self.value = initial_samples
 
-        self.scaler = StandardScaler()
-        self.sample_scaled = self.scaler.fit_transform(self.sample)
-        self.value_scaled = self.scaler.fit_transform(self.value.reshape(-1, 1)).ravel()
+        self.x_scaler = StandardScaler()
+        self.y_scaler = StandardScaler()
+
+        self.sample_scaled = self.x_scaler.fit_transform(self.sample)
+        self.value_scaled = self.y_scaler.fit_transform(self.value.reshape(-1, 1)).ravel()
 
         kernel = gpr_kernels.Matern(length_scale=1.0, nu=2.5)
 
         self.gp = GaussianProcessRegressor(
             kernel=kernel,
             n_restarts_optimizer=self.opt_args["GPR_iterations"],
-            alpha=1e-6,
-            normalize_y=True,
+            alpha=self.opt_args["GPR_alpha"],
+            normalize_y=False,
             optimizer=self._optimizer(),
         )
         self.gp.fit(self.sample_scaled, self.value_scaled)
@@ -138,8 +138,10 @@ class BayesianOptimizer:
 
         optimizer_type = self.opt_args.get("optimizer", None)
 
-        if optimizer_type is None:
+        if optimizer_type is None or optimizer_type == "l_bfgs_b":
             optimizer_callable = l_bfgs_b_modified
+        else:
+            raise ValueError(f"Unknown optimizer type: {optimizer_type}")
 
         return optimizer_callable
 
@@ -175,7 +177,9 @@ class BayesianOptimizer:
         idx_best = np.argmin(self.value)
         best_point = self.sample[idx_best]
         best_value = self.value[idx_best]
+
         utils.write_log(self.logger, f"Initial best point: {best_point}, value: {best_value}", "info")
+
         test_population = self.opt_args.get("test_population", None)
         constraints_bool = self.opt_args.get("constraints", None) is not None
 
@@ -183,7 +187,7 @@ class BayesianOptimizer:
         attempted_points = []
         no_improvement_iterations = 0
 
-        # Generate test samples
+        # Generate fixed candidate population
         if test_population is None and not constraints_bool:
             bnds = self.sampler.bounds
             pres = self.sampler.precision
@@ -198,7 +202,9 @@ class BayesianOptimizer:
                 "error",
             )
             raise ValueError("The user must either specify a test population or remove the sampling constraints.")
-        X_candidates_scaled = self.scaler.fit_transform(X_candidates)
+
+        # Extract the Exploration-Exploitation parameter for Expected Improvement
+        xi = self.opt_args.get("EI_exploration-exploitation", 0.01)
 
         for i in range(self.opt_args["max_tested_vectors"]):
             utils.write_log(self.logger, f"Iteration {i + 1} of {self.opt_args['max_tested_vectors']}.", "info")
@@ -206,27 +212,71 @@ class BayesianOptimizer:
             if self.sampler.seed is not None:
                 self.sampler.seed += 1
 
-            mu, sigma = self.gp.predict(X_candidates_scaled, return_std=True)
-            ei = gaussian_ei(X_candidates_scaled, self.gp)
-            candidate_sample = X_candidates[np.argmax(ei)]
+            # Refit scalers on the CURRENT training data
+            self.sample_scaled = self.x_scaler.fit_transform(self.sample)
+            self.value_scaled = self.y_scaler.fit_transform(self.value.reshape(-1, 1)).ravel()
+
+            X_candidates_scaled = self.x_scaler.transform(X_candidates)
+
+            # Fit GP on current data
+            self.gp.fit(self.sample_scaled, self.value_scaled)
+
+            # Compute EI using the best scaled value observed so far
+            y_opt = np.min(self.value_scaled)
+
+            ei = gaussian_ei(X_candidates_scaled, self.gp, y_opt=y_opt, xi=xi)
+
+            # Prevent re-evaluating already tested points
+            for x in self.sample:
+                duplicate_mask = np.all(np.isclose(X_candidates, x), axis=1)
+                ei[duplicate_mask] = -np.inf
+
+            # If all candidates have already been tested, stop
+            if np.all(~np.isfinite(ei)):
+                utils.write_log(
+                    self.logger, "All candidate points have already been evaluated. Stopping optimization.", "info"
+                )
+                break
+
+            # Select candidate with largest EI
+            candidate_idx = np.argmax(ei)
+            candidate_sample = X_candidates[candidate_idx]
+
+            # Evaluate objective function at the candidate point
             candidate_value = self.obj_func(candidate_sample)
             attempted_points.append((candidate_sample, candidate_value))
 
-            # Check for improvement
+            # Add new sample to the training data
+            self.sample = np.vstack((self.sample, candidate_sample))
+            self.value = np.append(self.value, candidate_value)
+
+            # Check tolerance and improvement
             if candidate_value <= self.opt_args["tolerance"]:
-                best_sample, best_value = candidate_sample, candidate_value
+                best_point = candidate_sample
+                best_value = candidate_value
+
                 utils.write_log(
                     self.logger,
                     f"Optimization reached the target value. ({candidate_value} <= {self.opt_args['tolerance']})",
                     "info",
                 )
-                utils.write_log(self.logger, f"Number of iterations: {i + 1}", "info")
+                utils.write_log(
+                    self.logger,
+                    f"Number of iterations: {i + 1}",
+                    "info",
+                )
                 break
 
             elif candidate_value < best_value:
-                best_sample, best_value = candidate_sample, candidate_value
-                utils.write_log(self.logger, f"New best sample: {best_sample}, Value: {best_value}", "info")
-                no_improvement_iterations = 0  # Reset the counter
+                best_point = candidate_sample
+                best_value = candidate_value
+                no_improvement_iterations = 0
+
+                utils.write_log(
+                    self.logger,
+                    f"New best sample: {best_point}, Value: {best_value}",
+                    "info",
+                )
 
             else:
                 no_improvement_iterations += 1
@@ -236,28 +286,34 @@ class BayesianOptimizer:
                     "info",
                 )
 
-            # Terminate if no improvement for max_no_improvement iterations
+            # Stop if no improvement for too long
             if no_improvement_iterations >= self.opt_args["max_no_improvement"]:
-                utils.write_log(self.logger, "Stopping optimization due to no significant improvement.", "info")
-                utils.write_log(self.logger, f"Number of iterations: {i + 1}", "info")
+                utils.write_log(
+                    self.logger,
+                    "Stopping optimization due to no significant improvement.",
+                    "info",
+                )
+                utils.write_log(
+                    self.logger,
+                    f"Number of iterations: {i + 1}",
+                    "info",
+                )
                 break
 
-            # Add the new sample to the training set
-            self.sample = np.vstack((self.sample, candidate_sample))
-            self.value = np.append(self.value, candidate_value)
-            self.sample_scaled = self.scaler.fit_transform(self.sample)
-            self.value_scaled = self.scaler.fit_transform(self.value.reshape(-1, 1)).ravel()
+            if self.sampler.seed is not None:
+                self.sampler.seed += 1
 
-            # Update the GP
-            self.gp.fit(self.sample_scaled, self.value_scaled)
-
-        # Extract the best point and value
+        # Extract true best point and value from all evaluated samples
         idx_best = np.argmin(self.value)
         best_point = self.sample[idx_best]
         best_value = self.value[idx_best]
 
         # Updates the simulation with the best point and value
-        utils.write_log(self.logger, "Updating simulation results with best value", "info")
+        utils.write_log(
+            self.logger,
+            "Updating simulation results with best value",
+            "info",
+        )
         self.obj_func(best_point)
 
         utils.write_log(

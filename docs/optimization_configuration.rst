@@ -14,9 +14,9 @@ The ``general_options`` section controls basic BOAR behavior.
 .. code-block:: yaml
 
    general_options:
-     'clear_start': True       # Re-creates output directory, deleting previous data
-     'silent': True            # Do not print log messages
-     'log_dev': False          # Print all log messages (including simulation logs)
+     'clear_start': True       # [bool] Re-create output directory on start
+     'silent': True            # [bool] Suppress log messages
+     'log_dev': False          # [bool] Print all logs including simulation logs
 
 BASEMENT Options
 ----------------
@@ -26,9 +26,9 @@ The ``basement_options`` section controls BASEMENT simulation settings.
 .. code-block:: yaml
 
    basement_options:
-     'cleanup': False          # Remove previous simulation results before running
-     'backend': omp            # Backend options: seq, omp, cuda, cudaC, cudaO
-     'nthreads': -1            # Number of cores (-1 = all available cores)
+     'cleanup': False          # [bool] Remove previous results before running
+     'backend': omp            # [str] Backend: seq, omp, cuda, cudaC, cudaO
+     'nthreads': -1            # [int] Number of cores (-1 = all available)
 
 Backend Options
 ~~~~~~~~~~~~~~~
@@ -55,9 +55,9 @@ Configure discharge files and simulation inputs.
 .. code-block:: yaml
 
    simulation_options:
-     'discharge_file': True                                # Discharge defined by txt file
-     'discharge_file_directory': /path/to/discharge_files  # Directory containing discharge files
-     'discharge_file_list': ['Q001.txt', 'Q002.txt']        # List of discharge files to use
+     'discharge_file': True                                # [bool] Define the model setup discharge using a TXT file. (Default: False)
+     'discharge_file_directory': /path/to/discharge_files  # [str] Directory containing discharge files. Only required if 'discharge_file' is True.
+     'discharge_file_list': ['Q001.txt', 'Q002.txt']       # [list] List of discharge files to use. Only required if 'discharge_file' is True.
 
 Optimization Variable Options
 -----------------------------
@@ -67,14 +67,14 @@ The ``optimization_variable_options`` section defines the calibration parameters
 .. code-block:: yaml
 
    optimization_variable_options:
-     'initial_vector': file   # Initial friction distribution (file, float, or list)
-     'regions': ['floodplain']  # Regions to optimize (None = all regions)
-     'constraints': None      # Parameter constraints (see below)
-     'bounds': [!!python/tuple [10, 60]]  # Optimization bounds
-     'precision': 1e-1        # Decimal precision (1, 0.1, 0.01, etc.)
-     'save_errors': True      # Save error comparison points to CSV
-     'save_tried_vectors': False  # Save results files for all tried vectors
-     'in_house_optimization': False  # Use in-house optimizer (False = use Optuna)
+     'initial_vector': file                 # [str] file, float, or list. (Default: file)
+     'regions': ['floodplain']              # [list] Regions to optimize. (Default: all friction regions)
+     'constraints': None                    # [dict] Parameter constraints. (Default: None, see below)
+     'bounds': None                         # [list] Optimization bounds. (Default: None)
+     'precision': 1e-1                      # [float] Decimal precision. (Default: 1)
+     'save_errors': True                    # [bool] Save error points to CSV. (Default: False)
+     'save_tried_vectors': False            # [bool] Save all results files. (Default: False)
+     'opt_engine': False                    # [str] Optimization engine ("boar" or "optuna"). Default: "boar"
 
 Initial Vector Options
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -146,15 +146,17 @@ The ``surrogate_model_options`` section controls the Gaussian Process Regression
 .. code-block:: yaml
 
    surrogate_model_options:
-     'opt_mem_override': False         # Override first memory check
-     'n_initial': 10                  # Minimum samples before iterative optimization
-     'max_tested_vectors': 50         # Maximum number of vectors to try
-     'tolerance': 1e-4                # Stop criterion for optimization
+     'tolerance': 1e-4                 # [float] Stop criterion
+     'n_initial': 5                    # [int] Min samples before optimization. (Default: 5)
+     'max_tested_vectors': 100         # [int] Max vectors to try. (Default: 100)
+     'opt_mem_override': False         # [bool] Override memory check. (Default: False)
 
-   # In-house optimization options (when in_house_optimization: True)
-     'test_population': 67956         # Number of samples for surrogate model
-     'GPR_iterations': 500            # Maximum GPR iterations
-     'max_no_improvement': 10         # Max iterations without improvement
+   # Only used if 'opt_engine' is set to "boar"
+     'test_population': 67956            # [int] Surrogate model samples
+     'max_no_improvement': 10            # [int] Max iterations without progress (Default: 100)
+     'GPR_iterations': 500               # [int] The number of restarts of the optimizer for finding the kernel’s parameters which maximize the log-marginal likelihood. (Default: 500)
+     'GPR_alpha': 1e-6                   # [float] Value added to the diagonal of the kernel matrix during fitting. This can prevent a potential numerical issue during fitting, by ensuring that the calculated values form a positive definite matrix. (Default: 1e-6)
+     'EI_exploration-exploitation': 0.01 # [float] Exploration-exploitation parameter for Expected Improvement acquisition function. (Default: 0.01)
 
 Memory Override Options
 ~~~~~~~~~~~~~~~~~~~~~~~

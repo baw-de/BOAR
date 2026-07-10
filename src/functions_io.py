@@ -10,8 +10,6 @@ import os
 import shutil
 
 import numpy as np
-
-# Third-party imports
 import pandas as pd
 
 # Import user defined functions
@@ -20,8 +18,10 @@ from user_defined_configs import constants as c
 # Create a logger for file_import.py
 logger = logging.getLogger("file_import")
 
+MeshData = dict[str, np.ndarray | dict[str, np.ndarray] | None]
 
-def read_mesh_file(filepath: str) -> dict:
+
+def read_mesh_file(filepath: str) -> MeshData:
     """
     Imports the mesh from a given filepath.
 
@@ -29,9 +29,9 @@ def read_mesh_file(filepath: str) -> dict:
         filepath (str): filepath to the mesh file
 
     Returns:
-        dict: dictionary containing the imported mesh
+        MeshData: dictionary containing the mesh data, including nodes, cells, and boundary conditions
     """
-    data: dict[str, np.ndarray | dict] = {
+    data: MeshData = {
         "nodes": None,  # Structured array for nodes
         "cells": None,  # Structured array for elements
         "boundary_conditions": {},  # Dictionary for node sets

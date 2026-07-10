@@ -1,0 +1,37 @@
+# .github/actions/setup-python-env/action.yml
+name: "Setup Python environment"
+description: "Install Python + dev dependencies (site-packages cache for 3.10 only)"
+
+inputs:
+  python-version:
+    description: "Python version to set up"
+    required: false
+    default: "3.10"
+
+runs:
+  using: "composite"
+  steps:
+    - uses: actions/setup-python@v6
+      id: setup-python
+      with:
+        python-version: ${{ inputs.python-version }}
+
+    # --------------------------------------------------------------
+    # Cache installed environment ONLY when python-version is exactly 3.10
+    # --------------------------------------------------------------
+    - name: Cache installed Python environment (3.10 only)
+      id: cache-venv
+      if: inputs.python-version == '3.10'
+      uses: actions/cache@v6
+      with:
+        path: ${{ env.pythonLocation }}
+        key: pyenv-${{ runner.os }}-${{ steps.setup-python.outputs.python-version }}-${{ hashFiles('requirements.txt', 'requirements-dev.txt') }}
+
+    - name: Install dependencies
+      shell: bash
+      # Skip the whole step when:
+      #   - cache exists AND python-version == '3.10'
+      if: steps.cache-venv.outputs.cache-hit != 'true'
+      run: |
+        python -m pip install --quiet --upgrade pip
+        pip install --quiet -r requirements-dev.txt

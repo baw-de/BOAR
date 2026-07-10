@@ -8,13 +8,16 @@ from pathlib import Path
 
 module_path = Path(__file__).parent.parent
 sys.path.insert(0, str(module_path))
+import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import optuna
+import scienceplots  # noqa: F401  — registers matplotlib styles on import
 
 from src import bo_optimizer, functions_sampler
 
 plt.style.use("science")
+matplotlib.use("Agg")
 
 
 # Ackley function
@@ -29,7 +32,7 @@ def ackley(x, a=20, b=0.2, c=2 * np.pi):
 def run_boar_optimization(
     n_dim=5, n_initial=20, n_trials=1000, bounds=None, seed=42, tolerance=1e-6, test_population=100000
 ):
-    """Run in-house Bayesian optimization."""
+    """Run BOAR Bayesian optimization."""
     if bounds is None:
         bounds = [(-5, 5)] * n_dim
 
@@ -51,6 +54,7 @@ def run_boar_optimization(
             "max_tested_vectors": n_trials,
             "test_population": test_population,
             "seed": seed,
+            "GPR_alpha": 1e-10,
         },
     )
     best_sample, best_value, attempted = optimizer.optimize(return_attempted_points=True)

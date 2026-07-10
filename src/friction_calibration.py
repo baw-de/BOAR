@@ -12,15 +12,12 @@ import os
 import shutil
 from decimal import ROUND_HALF_UP, Decimal
 
-# Third-party imports
 import numpy as np
 import optuna
 import pandas as pd
 
 from src import basement_tools as bmt
 from src import bo_optimizer as bo
-
-# Import Basement-Calibrator modules
 from src import functions_sampler, utils
 
 # Import user defined functions
@@ -36,7 +33,6 @@ class FrictionCalibration:
     def __init__(
         self, calibration_data: dict, simulation_folder: str, user_options: dict, logger: "logging.Logger | None" = None
     ):
-
         # General options
         self.logger = logger or logging.getLogger(__name__)
         self.calibration_data = calibration_data
@@ -189,12 +185,14 @@ class FrictionCalibration:
             "save_errors": args_optimization_var.get("save_errors", False),
             ## Surrogate model options
             "GPR_iterations": args_surrogate.get("GPR_iterations", 500),
+            "GPR_alpha": float(args_surrogate.get("GPR_alpha", 1e-6)),
+            "EI_exploration-exploitation": args_surrogate.get("EI_exploration-exploitation", 0.01),
             "tolerance": tolerance,
             "opt_mem_override": args_surrogate.get("opt_mem_override", False),
             "n_initial": args_surrogate.get("n_initial", 5),
-            "max_no_improvement": args_surrogate.get("max_no_improvement", 200),
+            "max_no_improvement": args_surrogate.get("max_no_improvement", 100),
             "test_population": args_surrogate.get("test_population", None),
-            "max_tested_vectors": args_surrogate.get("max_tested_vectors", 200),
+            "max_tested_vectors": args_surrogate.get("max_tested_vectors", 100),
             ## Simulation arguments
             "simulation_arguments": main_args["simulation_options"],
         }
@@ -227,7 +225,9 @@ class FrictionCalibration:
             override (bool): Override the first memory check. This allows the creation of new LHS samples.
 
         Returns:
-            float: The calibration error.
+            tuple: If initial is True and the memory file exists, returns a tuple containing the friction vectors and their corresponding calibration errors.
+            int: If search is True and the memory file does not exist, returns 0.
+            None: If search is False and the memory file does not exist, returns None.
         """
         # Define the path to the memory file and check if it exists
         memory_file_path = os.path.join(self.sim_folder, "optimization_memory.csv")
@@ -502,11 +502,11 @@ def main(data: dict, paths: dict, user_opts: dict) -> None:
     # Creates the calibrator instance
     calibrator = FrictionCalibration(data, folder_simulation, user_opts, logger)
 
-    if user_opts["optimization_variable_options"].get("in_house_optimization", False):
+    if user_opts["optimization_variable_options"].get("opt_engine", "boar") == "boar":
         sampler = functions_sampler.LatinHypercube(
             bounds=calibrator.opt_args["bounds"],
             precision=calibrator.opt_args["precision"],
-            seed=user_opts["sampling_options"]["seed"],
+            seed=user_opts["sampling_options"].get("seed", None),
             constraint_fns=[calibrator.opt_args["constraints"]],
             logger=logger,
             silent=calibrator.silent,
@@ -525,7 +525,7 @@ def main(data: dict, paths: dict, user_opts: dict) -> None:
 
         best_sample, _ = bo_method.optimize()
 
-    else:
+    elif user_opts["optimization_variable_options"].get("opt_engine", "boar") == "optuna":
         bounds = calibrator.opt_args.get("bounds", None)
         if bounds is None:
             raise ValueError("Bounds must be provided when using Optuna optimization.")
@@ -644,3 +644,8 @@ def main(data: dict, paths: dict, user_opts: dict) -> None:
 
         utils.write_log(logger, f"Optuna best sample: {best_sample}", "info")
         utils.write_log(logger, f"Optuna best value: {best_trial.value}", "info")
+
+    else:
+        raise ValueError(
+            f"Invalid optimization engine specified: {user_opts['optimization_variable_options'].get('opt_engine', 'boar')}. Supported engines are 'boar' and 'optuna'."
+        )

@@ -671,7 +671,7 @@ class SimulationManager:
             update_friction_in_h5(self, new_friction)
         update_model_config(self, model_config, model_friction_setup)
 
-    def define_discharge(self, new_discharge: float | str, file: bool = False) -> None:
+    def define_discharge(self, new_discharge: float or str, file: bool = False) -> None:
         """
         Define or update the discharge boundary condition.
 

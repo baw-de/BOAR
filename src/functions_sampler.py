@@ -8,15 +8,12 @@ if __name__ == "__main__":
 import logging
 from collections.abc import Callable
 from decimal import ROUND_HALF_UP, Decimal
+from typing import cast
 
-# Third-party imports
 import numpy as np
 from scipy.stats import qmc
 
-# Import Basement-Calibrator modules
 from src import utils
-
-# Import user defined functions
 
 
 class LatinHypercube:
@@ -106,13 +103,13 @@ class LatinHypercube:
                     quantized[row, col] = float(snapped)
 
             scaled = quantized
-        return scaled
+        return cast(np.ndarray, scaled)
 
     def _apply_constraints(self, samples: np.ndarray) -> np.ndarray:
         if self.constraint_fns == [None]:
             return samples
         mask = np.all([np.array([fn(sample) for fn in self.constraint_fns]) for sample in samples], axis=1)
-        return samples[mask]
+        return cast(np.ndarray, np.asarray(samples[mask], dtype=float))
 
     def extend_samples(self, existing_samples: np.ndarray, n_samples: int, only_new: bool = False) -> np.ndarray:
         """
@@ -195,12 +192,12 @@ class LatinHypercube:
                 )
             else:
                 utils.write_log(self.logger, f"Returning {len(generated_samples)} samples.", "info")
-                return np.array(list(generated_samples))
+                return cast(np.ndarray, np.asarray(list(generated_samples), dtype=float))
 
         utils.write_log(
             self.logger, f"Successfully generated {len(generated_samples)} samples.", "info", silent=not self.log_dev
         )
-        return np.array(list(generated_samples))
+        return cast(np.ndarray, np.asarray(list(generated_samples), dtype=float))
 
 
 class Uniform_sampler:
@@ -260,7 +257,7 @@ class Uniform_sampler:
 
             samples = quantized
 
-        return samples
+        return cast(np.ndarray, samples)
 
 
 class SOBOL_sampler:
@@ -317,4 +314,4 @@ class SOBOL_sampler:
 
             scaled_samples = quantized
 
-        return scaled_samples
+        return cast(np.ndarray, scaled_samples)

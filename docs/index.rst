@@ -1,7 +1,8 @@
 BOAR documentation
 ==================
 
-We present BOAR, an open-source Python framework for automated hydraulic roughness
+We present *Bayesian Optimization for Automated Roughness calibration in two-dimensional hydrodynamic models* (BOAR),
+an open-source Python framework for automated hydraulic roughness
 calibration in two-dimensional shallow-water models using BASEMENT. The tool
 combines Bayesian optimization with conditional sampling to incorporate expert
 knowledge, such as feasible parameter ranges and inter-parameter constraints,

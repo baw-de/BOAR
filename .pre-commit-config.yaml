@@ -1,14 +1,14 @@
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v5.0.0
+    rev: v6.0.0
     hooks:
       - id: end-of-file-fixer
       - id: trailing-whitespace
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.6.9
+    rev: v0.17.6
     hooks:
-      - id: ruff
+      - id: ruff-check
         args: [--fix]
       - id: ruff-format
 
@@ -19,6 +19,6 @@ repos:
         entry: mypy src/ boar.py
         language: python
         additional_dependencies:
-          - mypy==1.10.0
+          - mypy==2.4.1
           - types-PyYAML
         pass_filenames: false

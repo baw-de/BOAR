@@ -37,13 +37,13 @@ BASEMENT Version
 ``basement_version`` tells BOAR how to read the bed elevation from ``results.h5``,
 which BASEMENT stores differently from version to version:
 
-+---------+-------------------------------------------------------------+
-| Version | Bed elevation in ``results.h5``                             |
-+=========+=============================================================+
-| 4.2     | ``CellsAll/BottomEl`` (one static dataset)                  |
-+---------+-------------------------------------------------------------+
++---------+---------------------------------------------------------------+
+| Version | Bed elevation in ``results.h5``                               |
++=========+===============================================================+
+| 4.2     | ``CellsAll/BottomEl`` (one static dataset)                    |
++---------+---------------------------------------------------------------+
 | 4.3     | ``RESULTS/CellsAll/BottomEl/<time>`` (one dataset per output) |
-+---------+-------------------------------------------------------------+
++---------+---------------------------------------------------------------+
 
 The same setting selects the BASEMENT programs BOAR runs: on Windows those in
 ``C:\Program Files\BASEMENT <version>.0\bin`` (e.g. ``C:\Program Files\BASEMENT 4.3.0\bin``), on Linux those in

@@ -1,6 +1,8 @@
+# pip support: `pip install -e .` builds a metadata-only distribution that pulls in the
+# dependencies below; the code itself runs from the repository folder (see [tool.setuptools]).
 [build-system]
-requires = ["setuptools>=68", "wheel"]
-build-backend = "setuptools.backends.legacy:build"
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
 
 [project]
 name = "boar"
@@ -22,7 +24,9 @@ dependencies = [
     "torch>=2.4.0",
 ]
 
-[project.optional-dependencies]
+# Development tools (lint, type check, security, tests, docs).
+# `uv sync` installs them by default; with pip (>= 25.1): `pip install --group dev`.
+[dependency-groups]
 dev = [
     "bandit[sarif]>=1.7.5",
     "ruff>=0.5.0",
@@ -36,6 +40,18 @@ dev = [
     "SciencePlots>=2.1.0",
     "matplotlib>=3.9.0",
 ]
+
+# ── uv ───────────────────────────────────────────────────────────────────────
+[tool.uv]
+# BOAR runs from the repository folder (boar.py, src/, user_defined_configs/) and is not
+# built or installed as a package: `uv sync` installs only the dependencies into .venv.
+package = false
+
+# ── setuptools (pip) ─────────────────────────────────────────────────────────
+[tool.setuptools]
+# Install no modules: boar.py and src/ are run from the repository folder, not from site-packages.
+packages = []
+py-modules = []
 
 # ── Ruff ─────────────────────────────────────────────────────────────────────
 [tool.ruff]

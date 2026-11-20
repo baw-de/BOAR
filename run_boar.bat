@@ -25,7 +25,7 @@ where python >nul 2>nul
 if %errorlevel% neq 0 (
 	echo ERROR: Python was not found:
 	echo   "%PYTHON_EXE%"
-	echo Create .venv ^(python -m venv .venv ^&^& .venv\Scripts\pip install -e .^) or set PYTHON_EXE.
+	echo Create .venv in the project folder ^(uv sync, or python -m venv .venv and pip install -e .^), or set PYTHON_EXE.
 	exit /b 1
 )
 set "PYTHON_EXE=python"

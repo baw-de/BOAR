@@ -22,7 +22,7 @@ if [ ! -x "$PYTHON_EXE" ]; then
     else
         echo "ERROR: Python was not found:" >&2
         echo "  \"$PYTHON_EXE\"" >&2
-        echo "Create .venv (python3 -m venv .venv && .venv/bin/pip install -e .) or set PYTHON_EXE." >&2
+        echo "Create .venv in the project folder (uv sync, or python3 -m venv .venv and pip install -e .), or set PYTHON_EXE." >&2
         exit 1
     fi
 fi

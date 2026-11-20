@@ -28,26 +28,29 @@ BOAR can be used for:
 
 ## Installation
 
-BOAR requires **Python ≥ 3.11** and a working installation of **BASEMENT v4.3** or **v4.2** (set `basement_version` in `basement_options` to match; default `"4.3"`).
+BOAR requires **Python ≥ 3.11** and a working installation of **BASEMENT v4.3** or **v4.2** (set `basement_version` in `basement_options` to match; default `"4.3"`). The dependencies are listed in `pyproject.toml`. BOAR runs from the project folder in a virtual environment `.venv`, set up either with [uv](https://docs.astral.sh/uv/getting-started/installation/) (default; uses the pinned versions in `uv.lock` and downloads a suitable Python if needed) or with pip.
 
 ```bash
 # 1. Clone the repository
 git clone https://github.com/baw-de/boar.git
 cd boar
+```
 
-# 2. Create and activate a virtual environment
-python -m venv .venv
-source .venv/bin/activate        # Windows: .venv\Scripts\activate
-
-# 3. Install BOAR and its dependencies
-pip install -e .
+**2a. With uv (default)**
+```bash
+uv sync --no-dev                 # creates .venv with the locked dependencies
 ```
 
 BOAR calls BASEMENT's `BMv4_setup`, `BMv4_simulation` and `BMv4_results` from the install folder of `basement_version` in `basement_options` (default `"4.3"`): `C:\Program Files\BASEMENT <version>.0\bin` on Windows (e.g. `C:\Program Files\BASEMENT 4.3.0\bin`) and `/usr/bin` on Linux, where the BASEMENT Ubuntu package (`sudo apt install ./<downloaded BASEMENT package>.deb`) installs them. If BASEMENT is installed somewhere else, set `BASEMENT_PATH` in [`user_defined_configs/constants.py`](user_defined_configs/constants.py) to that folder.
 
-For development (linting, tests, docs):
+For development (linting, tests, docs), leave out `--no-dev` to install the `dev` dependency group as well: `uv sync`.
+
+**2b. With pip**, from the same `pyproject.toml` (versions not pinned by `uv.lock`):
 ```bash
-pip install -e ".[dev]"
+python -m venv .venv
+source .venv/bin/activate        # Windows: .venv\Scripts\activate
+pip install -e .                 # runtime dependencies
+pip install --group dev          # development tools (optional, pip >= 25.1)
 ```
 
 > For a step-by-step walkthrough including BASEMENT setup, build the docs locally and open `docs/_build/html/quickstart.html` and `docs/_build/html/installation.html` — see [Building the docs](#building-the-docs) below.
@@ -73,7 +76,7 @@ Edit this file before running BOAR. The key sections are:
 
 ## Running BOAR
 
-Ready-to-use launchers are provided: [`run_boar.bat`](run_boar.bat) (Windows) and [`run_boar.sh`](run_boar.sh) (Linux / macOS). They run `boar.py` from the project root with the Python of `.venv` (otherwise `python` / `python3` on the PATH; set `PYTHON_EXE` to use another one) and pass their options on. There is nothing to adjust in them: BOAR itself generates `setup.h5` from `model.json` and runs BASEMENT of the version set in `basement_options`.
+Ready-to-use launchers are provided: [`run_boar.bat`](run_boar.bat) (Windows) and [`run_boar.sh`](run_boar.sh) (Linux / macOS). They run `boar.py` from the project root with the Python of `.venv` (from `uv sync` or pip; otherwise `python` / `python3` on the PATH; set `PYTHON_EXE` to use another one) and pass their options on. There is nothing to adjust in them: BOAR itself generates `setup.h5` from `model.json` and runs BASEMENT of the version set in `basement_options`.
 
 ```bash
 # Windows
@@ -86,7 +89,7 @@ chmod +x run_boar.sh                       # once, if the file is not executable
 ./run_boar.sh --log-file my_run.log
 ```
 
-BOAR can also be started directly with `python boar.py [--log-file my_run.log]`. To run several instances side by side, copy the project folder; each copy runs from its own root.
+BOAR can also be started directly with `uv run boar.py [--log-file my_run.log]` (or `python boar.py` in an activated pip environment). To run several instances side by side, copy the project folder; each copy runs from its own root.
 
 ### Output
 
@@ -94,7 +97,7 @@ BOAR writes results to the output directory defined in `user_options.yaml`. A lo
 
 ## Building the docs
 
-The documentation is built locally with **Sphinx**. Make sure the dev dependencies are installed (`pip install -e ".[dev]"`), then:
+The documentation is built locally with **Sphinx**. Make sure the dev dependencies are installed (`uv sync`, or `pip install --group dev`) and `.venv` is activated (`source .venv/bin/activate`, Windows: `.venv\Scripts\activate`), then:
 
 ```bash
 # Optional: regenerate API stubs and YAML config pages first

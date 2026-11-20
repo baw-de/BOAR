@@ -103,12 +103,12 @@ directory in your terminal and execute the following command:
    run_boar.bat      # Windows
    ./run_boar.sh     # Linux / macOS
 
-Both scripts run ``boar.py`` with the Python of ``.venv`` (otherwise the one on the PATH; set
+Both scripts run ``boar.py`` with the Python of ``.venv`` (from ``uv sync`` or pip; otherwise the one on the PATH; set
 ``PYTHON_EXE`` to use another one) and pass their options on. BOAR itself generates ``setup.h5`` from
 ``model.json`` and runs the BASEMENT version set in ``basement_options``. Instead of the scripts, you can also run
 
 .. code-block:: bash
 
-   python boar.py
+   uv run boar.py      # or: python boar.py, with .venv activated
 
 Calibration progress and detailed execution logs are recorded in ``boar.log`` by default. Alternatively, a custom log file can be specified using the following command: ``python boar.py --log-file [filename]``.

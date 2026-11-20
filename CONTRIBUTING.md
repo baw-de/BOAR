@@ -44,16 +44,22 @@ We expect contributors to adhere to basic open-source community norms: be inclus
 
 ## Development Setup
 
-BOAR requires **Python ≥ 3.11**. We recommend using a virtual environment:
+BOAR requires **Python ≥ 3.11**. The default way to set up the environment is [**uv**](https://docs.astral.sh/uv/):
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate        # Windows: .venv\Scripts\activate
-pip install -e ".[dev]"
+uv sync
 ```
 
-This installs all runtime dependencies plus the development extras defined in `pyproject.toml`:
-`ruff`, `mypy`, `pytest`, `pytest-cov`, `bandit`, `pip-audit`, and `Sphinx`.
+This creates `.venv` with the locked runtime dependencies (`uv.lock`) plus the `dev` dependency group
+defined in `pyproject.toml`: `ruff`, `mypy`, `pytest`, `pytest-cov`, `bandit`, `pip-audit`, and `Sphinx`.
+Run the tools with `uv run <tool>` (e.g. `uv run pytest`), or activate `.venv` and call them directly
+as shown below.
+
+pip works as well: in an activated virtual environment, `pip install -e . --group dev` (pip ≥ 25.1)
+installs the same dependencies, unpinned (CI uses the versions in `uv.lock`).
+
+To add or change a dependency, use `uv add <package>` (or `uv add --dev <package>`) and commit the
+updated `pyproject.toml` and `uv.lock` together.
 
 ---
 
@@ -144,10 +150,11 @@ Start lenient; we aim to tighten toward `--strict` before v2.0.
 
 ```bash
 bandit -r src/ boar.py
-pip-audit
+uv export --frozen --no-dev --no-emit-project -o audit-requirements.txt
+pip-audit -r audit-requirements.txt --disable-pip
 ```
 
-These checks are also enforced in CI (see `.gitlab-ci.yml`).
+These checks are also enforced in CI (see `.github/workflows/ci.yml`).
 
 ---
 

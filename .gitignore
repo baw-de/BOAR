@@ -163,3 +163,9 @@ benchmarks/*.txt
 
 # Development and testing
 _mock*/
+
+# pip-audit input exported from uv.lock (CONTRIBUTING.md)
+audit-requirements.txt
+
+# Local Python pin (uv python pin); BOAR supports the whole requires-python range
+.python-version

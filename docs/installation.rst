@@ -1,23 +1,15 @@
 Installation
 ============
 
-The installation of BOAR is straightforward and can be done using pip.
-Follow the steps below to install BOAR in your Python environment.
+BOAR runs from its project folder in a virtual environment ``.venv``. Its dependencies are listed in
+``pyproject.toml``. The environment can be set up with `uv <https://docs.astral.sh/uv/>`_ (default), which
+installs the pinned versions of ``uv.lock``, or with pip.
 
 Prerequisites
 --------------
-Make sure you have Python 3.13 or higher installed on your system. You can check your Python version by running:
-
-.. code-block:: bash
-
-   python --version
-
-A virtual environment is recommended to manage dependencies. You can create and activate a virtual environment using the following commands:
-
-.. code-block:: bash
-
-   python -m venv boar_env
-   source boar_env/bin/activate  # On Windows use: boar_env\Scripts\activate
+BOAR needs Python 3.11 or higher. For the default setup, also install uv
+(see the `uv installation guide <https://docs.astral.sh/uv/getting-started/installation/>`_); it downloads
+a suitable Python itself if none is installed.
 
 Installation Steps
 ------------------
@@ -29,13 +21,26 @@ Installation Steps
 
       git clone <final_repository_url>
 
-2. **Install BOAR dependencies**: Navigate to the BOAR directory and install
-   the required dependencies using pip:
+2. **Install BOAR dependencies**: Navigate to the BOAR directory and create ``.venv`` with
+   one of the two options. The launchers ``run_boar.bat`` and ``run_boar.sh`` use this ``.venv``.
+
+   *With uv (default)*, using the locked versions:
 
    .. code-block:: bash
 
       cd boar
-      pip install -r requirements.txt
+      uv sync --no-dev      # leave out --no-dev to also install the development tools
+
+   *With pip*, using the same dependencies from ``pyproject.toml`` (versions not pinned by
+   ``uv.lock``; ``--group`` needs pip 25.1 or newer):
+
+   .. code-block:: bash
+
+      cd boar
+      python -m venv .venv
+      source .venv/bin/activate    # On Windows use: .venv\Scripts\activate
+      pip install -e .             # runtime dependencies
+      pip install --group dev      # development tools (optional)
 
 3. **Point BOAR to BASEMENT**: BOAR runs BASEMENT's ``BMv4_setup``, ``BMv4_simulation`` and
    ``BMv4_results`` from the install folder of ``basement_version`` in ``basement_options``
@@ -50,8 +55,9 @@ Installation Steps
    to that folder (it overrides the folder of ``basement_version``).
 
 4. **Verify Installation**: After the installation is complete, you can verify
-   that BOAR is installed correctly by running:
+   that BOAR and its dependencies load by running:
 
    .. code-block:: bash
 
-      python -c "import boar; print(boar.__version__)"
+      uv run boar.py --help        # uv setup
+      python boar.py --help        # pip setup, with .venv activated

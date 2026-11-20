@@ -102,10 +102,13 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-python-env
+      # Audit the locked runtime dependencies (uv.lock, without the dev group).
+      - name: Export locked runtime dependencies
+        run: uv export --frozen --no-dev --no-emit-project -o audit-requirements.txt
       - name: pip-audit (JSON artifact)
-        run: pip-audit -r requirements.txt --output pip-audit-report.json --format json || true
+        run: pip-audit -r audit-requirements.txt --disable-pip --output pip-audit-report.json --format json || true
       - name: pip-audit (summary, fails on CVEs)
-        run: pip-audit -r requirements.txt
+        run: pip-audit -r audit-requirements.txt --disable-pip
       - uses: actions/upload-artifact@v7
         if: always()
         with:

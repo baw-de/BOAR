@@ -37,7 +37,7 @@ optimization_variable_options:
     'expression': "x > y or np.isclose(x, y)"
     'variables': ['x', 'y']
   'bounds': [!!python/tuple [10, 60]] # [list of tuples] Optimization bounds. (Default: None)
-  'precision': 1e-1                   # [float] Decimal precision. (Default: 1)
+  'precision': 1                      # [float] Decimal precision. (Default: 1)
   'save_errors': True                 # [bool] Save error points to CSV. (Default: False)
   'save_tried_vectors': False         # [bool] Save all results files. (Default: False)
   'opt_engine': "boar"                # [str] Optimization engine ("boar" or "optuna"). Default: "boar"
@@ -53,7 +53,8 @@ sampling_options:
 # -----------------------------------------------------------------------------
 surrogate_model_options:
   'tolerance': 1e-4                   # [float] Stop criterion
-  'test_population': 67956            # [int] Surrogate model samples
+  'test_population': None             # [int] Surrogate model candidate samples. None = full feasible grid from bounds, precision and constraints, capped at max_test_population. (Default: None)
+  'max_test_population': 100000       # [int] Cap on the auto-sized test population. Only used when test_population is None. (Default: 100000)
   'opt_mem_override': False           # [bool] Override memory check. (Default: False)
   'n_initial': 5                      # [int] Min samples before optimization. (Default: 5)
   'max_tested_vectors': 100           # [int] Max vectors to try. (Default: 100)

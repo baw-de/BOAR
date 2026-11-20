@@ -6,6 +6,7 @@ if __name__ == "__main__":
 
 # Standard library imports
 import logging
+import math
 from collections.abc import Callable
 from decimal import ROUND_HALF_UP, Decimal
 from typing import cast
@@ -105,8 +106,60 @@ class LatinHypercube:
             scaled = quantized
         return cast(np.ndarray, scaled)
 
+    def _axis_values(self, lb: float, ub: float) -> list[float]:
+        """
+        Return every grid value reachable on one axis for the current precision.
+
+        The values are ``lb + k * precision`` for ``k = 0..floor((ub - lb) / precision)``, plus ``ub``
+        itself when it is not a multiple of the step away from ``lb`` (``_scale_and_round`` clamps to ``ub``,
+        so it is reachable). Decimal arithmetic keeps the values identical to the sampler's output.
+
+        Parameters:
+            lb (float): Lower bound of the axis.
+            ub (float): Upper bound of the axis.
+
+        Returns:
+            list[float]: Sorted grid values of the axis.
+        """
+        if self.precision is None:
+            raise ValueError("A grid is only defined when a precision is given.")
+
+        step_dec = Decimal(str(self.precision))
+        lb_dec = Decimal(str(lb))
+        ub_dec = Decimal(str(ub))
+        n_steps = int((ub_dec - lb_dec) // step_dec)
+
+        values = [float(lb_dec + k * step_dec) for k in range(n_steps + 1)]
+        if lb_dec + n_steps * step_dec < ub_dec:
+            values.append(float(ub_dec))
+        return values
+
+    def grid_size(self) -> int | None:
+        """
+        Number of points on the full precision grid within the bounds, before constraints.
+
+        Returns:
+            int | None: Product of the per-axis grid sizes, or None when no precision is given
+                (continuous search space).
+        """
+        if self.precision is None:
+            return None
+        return math.prod(len(self._axis_values(lb, ub)) for lb, ub in self.bounds)
+
+    def enumerate_grid(self) -> np.ndarray:
+        """
+        Enumerate every precision grid point within the bounds that satisfies the constraints.
+
+        Returns:
+            np.ndarray: Array of shape (n_feasible, n_dim) with the feasible grid points.
+        """
+        axes = [self._axis_values(lb, ub) for lb, ub in self.bounds]
+        mesh = np.meshgrid(*axes, indexing="ij")
+        grid = np.stack([m.ravel() for m in mesh], axis=1).astype(float)
+        return self._apply_constraints(grid)
+
     def _apply_constraints(self, samples: np.ndarray) -> np.ndarray:
-        if self.constraint_fns == [None]:
+        if not self.constraint_fns or self.constraint_fns == [None] or len(samples) == 0:
             return samples
         mask = np.all([np.array([fn(sample) for fn in self.constraint_fns]) for sample in samples], axis=1)
         return cast(np.ndarray, np.asarray(samples[mask], dtype=float))

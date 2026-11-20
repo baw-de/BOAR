@@ -154,7 +154,7 @@ class FrictionCalibration:
         ## Optimization precision
         precision = args_optimization_var.get("precision", 1)
         if isinstance(precision, str):
-            precision = float(precision)
+            precision = None if precision.strip().lower() in ("none", "null", "") else float(precision)
 
         ## Basement parameters
         args_basement = main_args["basement_options"]
@@ -165,6 +165,18 @@ class FrictionCalibration:
         tolerance = args_surrogate.get("tolerance", 1e-5)
         if isinstance(tolerance, str):
             tolerance = float(tolerance)
+
+        # Test population: None (default) derives it from bounds, precision and constraints
+        test_population = args_surrogate.get("test_population", None)
+        if isinstance(test_population, str):
+            test_population = None if test_population.strip().lower() in ("none", "null", "") else test_population
+        if test_population is not None:
+            test_population = int(float(test_population))
+
+        max_test_population = int(float(args_surrogate.get("max_test_population", bo.DEFAULT_MAX_TEST_POPULATION)))
+        if max_test_population <= 0:
+            utils.write_log(self.logger, "'max_test_population' must be a positive integer.", "error")
+            raise ValueError("'max_test_population' must be a positive integer.")
 
         # Export the optimization variable arguments
         output = {
@@ -191,7 +203,8 @@ class FrictionCalibration:
             "opt_mem_override": args_surrogate.get("opt_mem_override", False),
             "n_initial": args_surrogate.get("n_initial", 5),
             "max_no_improvement": args_surrogate.get("max_no_improvement", 100),
-            "test_population": args_surrogate.get("test_population", None),
+            "test_population": test_population,
+            "max_test_population": max_test_population,
             "max_tested_vectors": args_surrogate.get("max_tested_vectors", 100),
             ## Simulation arguments
             "simulation_arguments": main_args["simulation_options"],

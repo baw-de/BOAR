@@ -20,6 +20,7 @@ if __name__ == "__main__":
 # Standard library imports
 import logging
 from collections.abc import Callable
+from typing import cast
 
 # Third-party imports
 import numpy as np
@@ -31,6 +32,85 @@ from skopt.acquisition import gaussian_ei
 
 # Import Basement-Calibrator modules
 from src import utils
+
+# Default cap on the auto-sized test population (surrogate_model_options -> max_test_population)
+DEFAULT_MAX_TEST_POPULATION = 100_000
+
+# Largest raw grid (before constraints) that is enumerated point by point when test_population is None.
+# Larger grids are sampled instead. Raised to max_test_population if the user sets a larger cap.
+GRID_ENUMERATION_LIMIT = 1_000_000
+
+
+def build_candidate_population(
+    sampler,
+    test_population: int | str | None = None,
+    max_test_population: int = DEFAULT_MAX_TEST_POPULATION,
+    seed: int | None = None,
+    logger: logging.Logger | None = None,
+) -> np.ndarray:
+    """
+    Build the fixed candidate population on which the acquisition function is evaluated.
+
+    With an explicit ``test_population`` the sampler draws that many samples. When it is None, the size is
+    derived from the bounds, precision and constraints: the full feasible precision grid is used, or a random
+    subset of ``max_test_population`` points of it when it is larger. Grids too large to enumerate, and
+    continuous spaces (no precision), are sampled with ``max_test_population`` points.
+
+    Args:
+        sampler: Sampler with ``generate_samples`` and, for the automatic size, ``grid_size`` and
+            ``enumerate_grid`` (see ``functions_sampler.LatinHypercube``).
+        test_population: Number of candidates, or None (or "None") for the automatic size.
+        max_test_population: Cap on the automatic size.
+        seed: Seed for the random subset of an oversized feasible grid.
+        logger: Logger instance (optional).
+
+    Returns:
+        np.ndarray: Candidate points of shape (n_candidates, n_dim).
+
+    Raises:
+        ValueError: If max_test_population is not positive, or no grid point satisfies the constraints.
+    """
+    logger = logger or logging.getLogger(__name__)
+
+    if isinstance(test_population, str) and test_population.strip().lower() in ("none", "null", ""):
+        test_population = None
+
+    if test_population is not None:
+        test_population = int(test_population)
+        utils.write_log(logger, f"Test population set by the user: {test_population} candidates.", "info")
+        return cast(np.ndarray, sampler.generate_samples(test_population))
+
+    max_test_population = int(max_test_population)
+    if max_test_population <= 0:
+        raise ValueError("max_test_population must be a positive integer.")
+
+    grid_size = sampler.grid_size() if hasattr(sampler, "grid_size") else None
+    enumeration_limit = max(GRID_ENUMERATION_LIMIT, max_test_population)
+
+    if grid_size is not None and grid_size <= enumeration_limit:
+        candidates = sampler.enumerate_grid()
+        n_feasible = len(candidates)
+        if n_feasible == 0:
+            utils.write_log(logger, "No grid point satisfies the constraints within the bounds.", "error")
+            raise ValueError("No grid point satisfies the constraints within the bounds.")
+
+        if n_feasible > max_test_population:
+            rng = np.random.default_rng(seed)
+            idx = rng.choice(n_feasible, size=max_test_population, replace=False)
+            candidates = candidates[np.sort(idx)]
+            utils.write_log(
+                logger,
+                f"Test population: random subset of {max_test_population} of the {n_feasible} feasible grid points "
+                f"(capped by max_test_population).",
+                "info",
+            )
+        else:
+            utils.write_log(logger, f"Test population: all {n_feasible} feasible grid points.", "info")
+        return cast(np.ndarray, candidates)
+
+    reason = "no precision is given" if grid_size is None else f"the grid has {grid_size} points"
+    utils.write_log(logger, f"Test population: {max_test_population} sampled candidates ({reason}).", "info")
+    return cast(np.ndarray, sampler.generate_samples(max_test_population))
 
 
 class BayesianOptimizer:
@@ -165,7 +245,7 @@ class BayesianOptimizer:
                 - attempted_points (list): All points tried during optimization (optional).
 
         Raises:
-            ValueError: If test population and constraints are both unspecified.
+            ValueError: If max_test_population is not positive, or no grid point satisfies the constraints.
 
         Example:
             >>> best_params, best_score = optimizer.optimize()
@@ -180,28 +260,18 @@ class BayesianOptimizer:
 
         utils.write_log(self.logger, f"Initial best point: {best_point}, value: {best_value}", "info")
 
-        test_population = self.opt_args.get("test_population", None)
-        constraints_bool = self.opt_args.get("constraints", None) is not None
-
         # Start counters
         attempted_points = []
         no_improvement_iterations = 0
 
-        # Generate fixed candidate population
-        if test_population is None and not constraints_bool:
-            bnds = self.sampler.bounds
-            pres = self.sampler.precision
-            n_max_samples = int((np.max(bnds) - np.min(bnds)) / pres) + 1
-            X_candidates = self.sampler.generate_samples(n_max_samples)
-        elif test_population is not None:
-            X_candidates = self.sampler.generate_samples(self.opt_args["test_population"])
-        else:
-            utils.write_log(
-                self.logger,
-                "The user must either specify a test population or remove the sampling constraints.",
-                "error",
-            )
-            raise ValueError("The user must either specify a test population or remove the sampling constraints.")
+        # Generate fixed candidate population (auto-sized from bounds, precision and constraints when None)
+        X_candidates = build_candidate_population(
+            self.sampler,
+            test_population=self.opt_args.get("test_population", None),
+            max_test_population=self.opt_args.get("max_test_population", DEFAULT_MAX_TEST_POPULATION),
+            seed=getattr(self.sampler, "seed", None),
+            logger=self.logger,
+        )
 
         # Extract the Exploration-Exploitation parameter for Expected Improvement
         xi = self.opt_args.get("EI_exploration-exploitation", 0.01)

@@ -93,7 +93,7 @@ The ``optimization_variable_options`` section defines the calibration parameters
      'regions': ['floodplain']              # [list] Regions to optimize. (Default: all friction regions)
      'constraints': None                    # [dict] Parameter constraints. (Default: None, see below)
      'bounds': None                         # [list] Optimization bounds. (Default: None)
-     'precision': 1e-1                      # [float] Decimal precision. (Default: 1)
+     'precision': 1                         # [float] Decimal precision. (Default: 1)
      'save_errors': True                    # [bool] Save error points to CSV. (Default: False)
      'save_tried_vectors': False            # [bool] Save all results files. (Default: False)
      'opt_engine': False                    # [str] Optimization engine ("boar" or "optuna"). Default: "boar"
@@ -174,11 +174,29 @@ The ``surrogate_model_options`` section controls the Gaussian Process Regression
      'opt_mem_override': False         # [bool] Override memory check. (Default: False)
 
    # Only used if 'opt_engine' is set to "boar"
-     'test_population': 67956            # [int] Surrogate model samples
+     'test_population': None             # [int] Surrogate model candidate samples. None = auto-sized (see below). (Default: None)
+     'max_test_population': 100000       # [int] Cap on the auto-sized test population. (Default: 100000)
      'max_no_improvement': 10            # [int] Max iterations without progress (Default: 100)
      'GPR_iterations': 500               # [int] The number of restarts of the optimizer for finding the kernel’s parameters which maximize the log-marginal likelihood. (Default: 500)
      'GPR_alpha': 1e-6                   # [float] Value added to the diagonal of the kernel matrix during fitting. This can prevent a potential numerical issue during fitting, by ensuring that the calculated values form a positive definite matrix. (Default: 1e-6)
      'EI_exploration-exploitation': 0.01 # [float] Exploration-exploitation parameter for Expected Improvement acquisition function. (Default: 0.01)
+
+Test Population
+~~~~~~~~~~~~~~~
+
+The test population is the fixed set of candidate vectors on which the Expected Improvement is evaluated.
+With ``'test_population': None`` (default) its size follows from the bounds, the precision and the constraints:
+
+* every precision grid point inside the bounds that satisfies the constraints is a candidate. For example,
+  two regions with bounds ``[10, 60]``, precision ``1`` and the constraint ``x >= y`` give
+  ``51 * 52 / 2 = 1326`` candidates;
+* if the feasible grid holds more than ``max_test_population`` points, a random (seeded) subset of
+  ``max_test_population`` points is used;
+* if the grid is too large to enumerate (more than 1,000,000 points before constraints, or more than
+  ``max_test_population`` if that is larger), or no precision is given, ``max_test_population`` samples
+  are drawn with Latin Hypercube Sampling.
+
+An integer ``test_population`` draws that many Latin Hypercube samples instead.
 
 Memory Override Options
 ~~~~~~~~~~~~~~~~~~~~~~~

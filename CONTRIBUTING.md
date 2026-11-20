@@ -44,7 +44,7 @@ We expect contributors to adhere to basic open-source community norms: be inclus
 
 ## Development Setup
 
-BOAR requires **Python ≥ 3.10**. We recommend using a virtual environment:
+BOAR requires **Python ≥ 3.11**. We recommend using a virtual environment:
 
 ```bash
 python -m venv .venv

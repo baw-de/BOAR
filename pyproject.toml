@@ -8,11 +8,10 @@ version = "1.0.0"
 description = "Bayesian Optimization for Automated Roughness calibration in 2D hydrodynamic models"
 readme = "README.md"
 license = { text = "GPLv3" }
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
     "h5py>=3.11.0",
-    "numpy>=2.1,<2.3; python_version == '3.10'",
-    "numpy>=2.3.0; python_version >= '3.11'",
+    "numpy>=2.3.0",
     "openpyxl>=3.1.5",
     "optuna>=4.0.0",
     "pandas>=2.2.0",
@@ -40,7 +39,7 @@ dev = [
 
 # ── Ruff ─────────────────────────────────────────────────────────────────────
 [tool.ruff]
-target-version = "py310"
+target-version = "py311"
 line-length = 120
 exclude = [
     "user_defined_configs",   # user-editable area, not part of the library
@@ -79,7 +78,7 @@ indent-style = "space"
 
 # ── mypy ─────────────────────────────────────────────────────────────────────
 [tool.mypy]
-python_version = "3.10"
+python_version = "3.11"
 # Start lenient; tighten to --strict before v2.0
 warn_return_any = true
 warn_unused_configs = true

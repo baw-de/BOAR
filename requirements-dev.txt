@@ -1,7 +1,6 @@
-# ── Runtime / project dependencies (py310–py314) ──────────
+# ── Runtime / project dependencies (py311–py315) ──────────
 h5py>=3.11.0
-numpy>=2.1,<2.3; python_version == "3.10"
-numpy>=2.3.0; python_version >= "3.11"
+numpy>=2.3.0
 openpyxl>=3.1.5
 optuna>=4.0.0
 pandas>=2.2.0

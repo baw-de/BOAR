@@ -28,7 +28,7 @@ BOAR can be used for:
 
 ## Installation
 
-BOAR requires **Python ≥ 3.10** and a working installation of **BASEMENT v4.3** or **v4.2** (set `basement_version` in `basement_options` to match; default `"4.3"`).
+BOAR requires **Python ≥ 3.11** and a working installation of **BASEMENT v4.3** or **v4.2** (set `basement_version` in `basement_options` to match; default `"4.3"`).
 
 ```bash
 # 1. Clone the repository

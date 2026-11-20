@@ -1,0 +1,12 @@
+# Keep the GitHub Actions pins in .github/workflows and the composite action up to date.
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directories:
+      - "/"
+      - "/.github/actions/setup-python-env"
+    schedule:
+      interval: "weekly"
+    groups:
+      github-actions:
+        patterns: ["*"]

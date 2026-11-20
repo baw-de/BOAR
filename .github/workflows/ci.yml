@@ -32,7 +32,7 @@ jobs:
       security-events: write        # write code scanning results
       actions: read                 # read the workflow run (fixes the "workflow-runs" error)
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-python-env
 
       - name: Bandit scan (SARIF for Security tab)
@@ -69,7 +69,7 @@ jobs:
       checks: write                 # reviewdog check runs
       pull-requests: write          # inline PR comments
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-python-env
 
       # GitHub-native annotations: ruff's github format emits ::error:: lines
@@ -89,7 +89,7 @@ jobs:
     runs-on: ubuntu-latest
     continue-on-error: true          # was: allow_failure: true
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-python-env
       - run: mypy src/ boar.py
 
@@ -100,7 +100,7 @@ jobs:
     needs: [security]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-python-env
       - name: pip-audit (JSON artifact)
         run: pip-audit -r requirements.txt --output pip-audit-report.json --format json || true
@@ -123,17 +123,17 @@ jobs:
     strategy:
       fail-fast: false                       # let all versions run even if one fails
       matrix:
-        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
+        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14", "3.15"]
     name: test (py${{ matrix.python-version }})
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-python-env
         with:
           python-version: ${{ matrix.python-version }}
       - name: Run pytest with coverage
         run: pytest --cov-report=xml:coverage.xml
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v7
         with:
           files: coverage.xml
           fail_ci_if_error: false
@@ -162,12 +162,12 @@ jobs:
       cancel-in-progress: false
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
       - name: Setup Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v7
         with:
           python-version: "3.12"
 
@@ -198,10 +198,10 @@ jobs:
         run: sphinx-build -b html docs docs/_build/html
 
       - name: Setup Pages
-        uses: actions/configure-pages@v5
+        uses: actions/configure-pages@v6
 
       - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v5
         with:
           path: docs/_build/html
 
@@ -221,4 +221,4 @@ jobs:
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5

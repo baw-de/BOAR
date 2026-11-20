@@ -29,6 +29,25 @@ The ``basement_options`` section controls BASEMENT simulation settings.
      'cleanup': False          # [bool] Remove previous results before running
      'backend': omp            # [str] Backend: seq, omp, cuda, cudaC, cudaO
      'nthreads': -1            # [int] Number of cores (-1 = all available)
+     'basement_version': "4.3" # [str] BASEMENT version: "4.2" or "4.3" (Default: "4.3")
+
+BASEMENT Version
+~~~~~~~~~~~~~~~~
+
+``basement_version`` tells BOAR how to read the bed elevation from ``results.h5``,
+which BASEMENT stores differently from version to version:
+
++---------+-------------------------------------------------------------+
+| Version | Bed elevation in ``results.h5``                             |
++=========+=============================================================+
+| 4.2     | ``CellsAll/BottomEl`` (one static dataset)                  |
++---------+-------------------------------------------------------------+
+| 4.3     | ``RESULTS/CellsAll/BottomEl/<time>`` (one dataset per output) |
++---------+-------------------------------------------------------------+
+
+Set it to the version installed at ``BASEMENT_PATH`` (``user_defined_configs/constants.py``).
+If it does not match the results, BOAR stops with an error that names the version
+the file appears to come from.
 
 Backend Options
 ~~~~~~~~~~~~~~~

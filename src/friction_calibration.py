@@ -182,6 +182,7 @@ class FrictionCalibration:
             "basement_path": c.BASEMENT_PATH,
             "nthreads": args_basement.get("nthreads", -1),
             "backend": args_basement.get("backend", "omp"),
+            "basement_version": args_basement.get("basement_version", bmt.DEFAULT_BASEMENT_VERSION),
             "save_errors": args_optimization_var.get("save_errors", False),
             ## Surrogate model options
             "GPR_iterations": args_surrogate.get("GPR_iterations", 500),

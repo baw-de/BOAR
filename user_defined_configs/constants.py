@@ -23,7 +23,8 @@ PROJECT_ROOT = pathlib.Path(__file__).parent.parent
 
 # Constants for the project
 # The paths can also be full paths if needed, using pathlib allows for relative paths that are more flexible across different environments.
-BASEMENT_PATH = r"C:\Program Files\BASEMENT 4.2.0\bin"
+# The installed version must match 'basement_version' in user_options.yaml (basement_options).
+BASEMENT_PATH = r"C:\Program Files\BASEMENT 4.3.0\bin"
 SIMULATION_FOLDER = PROJECT_ROOT / "_mock_simulation_folder"
 MESH_FOLDER = PROJECT_ROOT / "_mock_meshes"
 SUPPORT_DATA_FOLDER = PROJECT_ROOT / "_mock_support_files"

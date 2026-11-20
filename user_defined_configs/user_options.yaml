@@ -17,6 +17,7 @@ basement_options:
   'cleanup': False        # [bool] Remove previous results before running
   'backend': omp          # [str] Backend: seq, omp, cuda, cudaC, cudaO
   'nthreads': -1          # [int] Number of cores (-1 = all available)
+  'basement_version': "4.3" # [str] BASEMENT version that writes the results: "4.2" or "4.3". (Default: "4.3")
 
 # -----------------------------------------------------------------------------
 # Simulation Options

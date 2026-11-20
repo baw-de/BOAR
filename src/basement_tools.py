@@ -31,6 +31,13 @@ import numpy as np
 from src import functions_io, utils
 from user_defined_configs import constants as c
 
+# BASEMENT version assumed when ``basement_options`` has no ``basement_version``.
+DEFAULT_BASEMENT_VERSION = "4.3"
+# Supported (major, minor) versions. They differ in where results.h5 stores the bed elevation:
+#   4.2: static dataset   CellsAll/BottomEl
+#   4.3: one per output   RESULTS/CellsAll/BottomEl/<time key>
+SUPPORTED_BASEMENT_VERSIONS = ((4, 2), (4, 3))
+
 
 class SimulationManager:
     """
@@ -65,6 +72,9 @@ class SimulationManager:
         self.silent = silent
         self.log_dev = log_dev
         self.run_parameters = run_parameters
+        self.basement_version = self._parse_basement_version(
+            run_parameters.get("basement_version", DEFAULT_BASEMENT_VERSION)
+        )
         self.mesh_file = self.get_computational_mesh_name()
         self.save_freq = self._get_save_freq()
 
@@ -75,6 +85,71 @@ class SimulationManager:
             self.logger = logger
 
         self.basement_path = c.BASEMENT_PATH
+
+    @staticmethod
+    def _parse_basement_version(version: Any) -> tuple[int, int]:
+        """
+        Parse the user's BASEMENT version into a ``(major, minor)`` tuple.
+
+        Accepts strings such as ``"4.3"``, ``"4.2.0"`` or ``"v4.3"`` and numbers such as ``4.3``.
+
+        Args:
+            version: Version given in ``basement_options['basement_version']``.
+
+        Returns:
+            tuple[int, int]: The ``(major, minor)`` version.
+
+        Raises:
+            ValueError: If the version cannot be parsed or is not supported.
+        """
+        supported = ", ".join(f"{major}.{minor}" for major, minor in SUPPORTED_BASEMENT_VERSIONS)
+        text = str(version).strip().lstrip("vV")
+        parts = text.split(".")
+        try:
+            major, minor = int(parts[0]), int(parts[1])
+        except (IndexError, ValueError):
+            raise ValueError(f"Invalid 'basement_version': {version!r}. Use one of: {supported}.") from None
+        if (major, minor) not in SUPPORTED_BASEMENT_VERSIONS:
+            raise ValueError(f"Unsupported 'basement_version': {version!r}. Supported versions: {supported}.")
+        return major, minor
+
+    def _read_bottom_elevation(self, h5file: h5py.File, time_key: str) -> np.ndarray:
+        """
+        Read the cell bed elevation from an open results.h5 file.
+
+        BASEMENT 4.2 stores it once, in ``CellsAll/BottomEl``. BASEMENT 4.3 stores it with every
+        output, in ``RESULTS/CellsAll/BottomEl/<time key>``; the value for ``time_key`` is returned.
+
+        Args:
+            h5file: Open results.h5 file.
+            time_key: Output key of the time step being extracted (same key as ``HydState``).
+
+        Returns:
+            np.ndarray: Flattened bed elevation, one value per cell.
+
+        Raises:
+            KeyError: If the bed elevation is not where the configured version stores it.
+        """
+        path_42 = "CellsAll/BottomEl"
+        path_43 = "RESULTS/CellsAll/BottomEl"
+        version = ".".join(map(str, self.basement_version))
+
+        if self.basement_version >= (4, 3):
+            expected, other, other_version = f"{path_43}/{time_key}", path_42, "4.2"
+        else:
+            expected, other, other_version = path_42, path_43, "4.3"
+
+        if expected not in h5file:
+            message = f"Bed elevation '{expected}' not found in results file (basement_version = {version})."
+            if other in h5file:
+                message += (
+                    f" The file has '{other}', so it looks like BASEMENT {other_version} output:"
+                    f" set 'basement_version: \"{other_version}\"' in basement_options."
+                )
+            utils.write_log(self.logger, message, level="error")
+            raise KeyError(message)
+
+        return np.array(h5file[expected]).flatten()
 
     def get_computational_mesh_name(self) -> str:
         """
@@ -366,11 +441,15 @@ class SimulationManager:
                         └── Results array (wse, ux, uy)
 
         Water surface elevation (wse) is stored in the first column. To calculate
-        water depth, subtract bed elevation from wse. Bed elevation is located in::
+        water depth, subtract bed elevation from wse. Where the bed elevation is
+        stored depends on ``basement_options['basement_version']``::
 
-            results.h5
-            └── CellsAll
-                └── BottomEl
+            BASEMENT 4.2                 BASEMENT 4.3
+            results.h5                   results.h5
+            └── CellsAll                 └── RESULTS
+                └── BottomEl                 └── CellsAll
+                                                 └── BottomEl
+                                                     └── Saving times
 
         Args:
             centroids_dict: Dictionary containing mesh centroids indexed by mesh name.
@@ -400,12 +479,9 @@ class SimulationManager:
             with h5py.File(results_file, "r") as h5file:
                 cells_all = h5file["RESULTS"]["CellsAll"]
 
-                # Extract bottom elevation
-                bottom_el = np.array(h5file["CellsAll"]["BottomEl"]).flatten()
-                utils.write_log(self.logger, f"Bottom elevation shape: {bottom_el.shape}", silent=not self.log_dev)
-
                 # Process saving times and extract relevant data
-                saving_times_ids = list(cells_all["HydState"].keys())
+                # Sorted numerically: h5py returns keys in lexicographic order.
+                saving_times_ids = sorted(cells_all["HydState"].keys(), key=int)
                 saving_times = [int(t) * self.save_freq for t in saving_times_ids]
 
                 if sim_time == -1:
@@ -418,13 +494,18 @@ class SimulationManager:
                         raise ValueError(f"Simulation time {sim_time} not found in saving times.")
                     time = saving_times_ids[saving_times.index(sim_time)]
 
+                # Extract bottom elevation (location depends on the BASEMENT version)
+                bottom_el = self._read_bottom_elevation(h5file, time)
+                utils.write_log(self.logger, f"Bottom elevation shape: {bottom_el.shape}", silent=not self.log_dev)
+
                 results_hyd = np.array(cells_all["HydState"][time])  # Hydrodynamic state
                 results_rey = np.array(cells_all["ReyState"][time])  # Reynolds state
                 results_trb = np.array(cells_all["TrbState"][time])  # Turbulence state
 
             with h5py.File(results_aux_file, "r") as h5file:
                 # Process saving times and extract relevant data
-                saving_times_ids = list(h5file["flow_velocity"].keys())
+                # Aux keys are not zero-padded ('0', '1', '10', ...), so sort numerically.
+                saving_times_ids = sorted(h5file["flow_velocity"].keys(), key=int)
                 saving_times = [int(t) * self.save_freq for t in saving_times_ids]
                 if sim_time == -1:
                     time = saving_times_ids[-1]

@@ -28,7 +28,7 @@ BOAR can be used for:
 
 ## Installation
 
-BOAR requires **Python ≥ 3.10** and a working installation of **BASEMENT v4.2** (or compatible version).
+BOAR requires **Python ≥ 3.10** and a working installation of **BASEMENT v4.3** or **v4.2** (set `basement_version` in `basement_options` to match; default `"4.3"`).
 
 ```bash
 # 1. Clone the repository
@@ -59,7 +59,7 @@ Edit this file before running BOAR. The key sections are:
 | Section | What to configure |
 |---------|------------------|
 | `general_options` | Logging verbosity, fresh-start flag |
-| `basement_options` | BASEMENT backend (`seq`, `omp`, `cuda`), number of CPU cores |
+| `basement_options` | BASEMENT backend (`seq`, `omp`, `cuda`), number of CPU cores, BASEMENT version (`4.2` or `4.3`) |
 | `simulation_options` | Path to discharge input files |
 | `optimization_variable_options` | Roughness regions, parameter bounds, constraint expressions |
 | `sampling_options` | Number of Latin Hypercube samples, random seed |

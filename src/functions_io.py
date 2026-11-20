@@ -5,9 +5,11 @@ if __name__ == "__main__":
     raise Exception("This file must be run as module")
 
 # Standard library imports
+import json
 import logging
 import os
 import shutil
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -19,6 +21,9 @@ from user_defined_configs import constants as c
 logger = logging.getLogger("file_import")
 
 MeshData = dict[str, np.ndarray | dict[str, np.ndarray] | None]
+
+# BASEMENT configuration files copied from SIMULATION_CONFIG_FOLDER into the run folder
+SIMULATION_CONFIG_FILES = ("model.json", "simulation.json", "results.json")
 
 
 def read_mesh_file(filepath: str) -> MeshData:
@@ -91,13 +96,8 @@ def find_available_meshes(paths: dict) -> dict:
     Returns:
         dict: dictionary containing the loaded meshes
     """
-    # Creates a list with the files to be imported
-    to_import = os.listdir(paths["folder_mesh"])
-
-    # Validate that the files to be imported are mesh files
-    for file in to_import:
-        if not file.endswith(".2dm"):
-            to_import.remove(file)
+    # Creates a list with the mesh files to be imported (skips .gitkeep, mesh_centroids/ and other files)
+    to_import = [file for file in os.listdir(paths["folder_mesh"]) if file.endswith(".2dm")]
 
     # Checks if there are files to be imported
     if len(to_import) == 0:
@@ -150,12 +150,106 @@ def read_csv_files_in_folder(path: str) -> dict:
     return output
 
 
+def _absolute_path(value: str, search_dirs: list[Path], label: str, logger: logging.Logger) -> str:
+    """
+    Return ``value`` as an absolute path, resolving a relative one against ``search_dirs`` in order.
+
+    A path found in none of them is returned unchanged, with a warning.
+    """
+    path = Path(value)
+    if path.is_absolute():
+        return value
+    for folder in search_dirs:
+        candidate = (folder / path).resolve()
+        if candidate.exists():
+            return str(candidate)
+    logger.warning(f"{label} '{value}' not found in {[str(d) for d in search_dirs]}; left unchanged.")
+    return value
+
+
+def prepare_simulation_folder(
+    config_folder: str | Path, output_root: str | Path, overwrite: bool, logger: logging.Logger
+) -> Path:
+    """
+    Copy the original BASEMENT configuration into ``output_root / <simulation_name>`` and return that folder.
+
+    The files in ``config_folder`` are only read. The name comes from ``SETUP.simulation_name`` in model.json. The JSON files are always copied fresh, so every run starts from the original friction and
+    discharge. With ``overwrite`` the case folder is deleted first; without it, earlier results such as
+    optimization_memory.csv stay and the run resumes from them.
+
+    In the copied model.json relative ``mesh_file`` and ``discharge_file`` paths are made absolute, resolved
+    against ``config_folder`` and then the project root.
+
+    Args:
+        config_folder: Folder holding model.json, simulation.json and results.json.
+        output_root: Folder in which the case folder is created.
+        overwrite: Delete an existing case folder before copying.
+        logger: Logger for progress and error messages.
+
+    Returns:
+        Path: The case folder, in which BOAR runs the calibration.
+
+    Raises:
+        FileNotFoundError: If a configuration file is missing.
+        KeyError: If model.json has no simulation name.
+        ValueError: If the simulation name is not a plain folder name.
+    """
+    config_folder = Path(config_folder)
+    output_root = Path(output_root)
+
+    missing = [name for name in SIMULATION_CONFIG_FILES if not (config_folder / name).is_file()]
+    if missing:
+        message = f"Missing BASEMENT configuration files in {config_folder}: {missing}"
+        logger.error(message)
+        raise FileNotFoundError(message)
+
+    with open(config_folder / "model.json") as f:
+        model_config = json.load(f)
+
+    name = model_config.get("SETUP", {}).get(c.SIMULATION_NAME_KEY)
+    if not isinstance(name, str) or not name.strip():
+        message = (
+            f"{config_folder / 'model.json'} has no 'SETUP.{c.SIMULATION_NAME_KEY}'. Set it to name the case, "
+            f'e.g. {{"SETUP": {{"{c.SIMULATION_NAME_KEY}": "my_case", ...}}}}.'
+        )
+        logger.error(message)
+        raise KeyError(message)
+    name = name.strip()
+    if name in (".", "..") or any(sep in name for sep in ("/", "\\", ":")):
+        message = f"'SETUP.{c.SIMULATION_NAME_KEY}' must be a plain folder name, got {name!r}."
+        logger.error(message)
+        raise ValueError(message)
+
+    case_folder = output_root / name
+    if overwrite and case_folder.exists():
+        logger.info(f"overwrite is True: deleting {case_folder}")
+        shutil.rmtree(case_folder)
+    case_folder.mkdir(parents=True, exist_ok=True)
+
+    for filename in SIMULATION_CONFIG_FILES:
+        shutil.copyfile(config_folder / filename, case_folder / filename)
+
+    # Adapt the copied model.json to its new location
+    search_dirs = [config_folder.resolve(), Path(c.PROJECT_ROOT).resolve()]
+    plane = model_config.get("SETUP", {}).get("BASEHPC", {}).get("BASEPLANE_2D", {})
+    geometry = plane.get("GEOMETRY", {})
+    if isinstance(geometry.get("mesh_file"), str):
+        geometry["mesh_file"] = _absolute_path(geometry["mesh_file"], search_dirs, "mesh_file", logger)
+    for bc in plane.get("HYDRAULICS", {}).get("BOUNDARY", {}).get("STANDARD", []):
+        if isinstance(bc, dict) and isinstance(bc.get("discharge_file"), str):
+            bc["discharge_file"] = _absolute_path(bc["discharge_file"], search_dirs, "discharge_file", logger)
+    with open(case_folder / "model.json", "w") as f:
+        json.dump(model_config, f, indent=4)
+
+    logger.info(f"Simulation '{name}': originals in {config_folder}, run folder {case_folder}")
+    return case_folder
+
+
 def setup_directories(project_path, user_options, logger):
-    folder_simulation = c.SIMULATION_FOLDER
     folder_mesh = c.MESH_FOLDER
     folder_centroids = os.path.join(folder_mesh, "mesh_centroids")
     folder_ground_truth = c.GROUND_TRUTH_FOLDER
-    folder_output = os.path.join(project_path, "output")
+    folder_output = c.OUTPUT_FOLDER
     folder_support = c.SUPPORT_DATA_FOLDER
 
     if not os.path.exists(folder_ground_truth):
@@ -166,17 +260,16 @@ def setup_directories(project_path, user_options, logger):
             "ground_truth folder not found. Please populate the newly created directories accourdingly."
         )
 
-    if user_options["general_options"]["clear_start"] and os.path.exists(folder_output):
-        shutil.rmtree(folder_output)
-        os.makedirs(folder_output)
+    general_options = user_options.get("general_options", {})
+    if "overwrite" in general_options:
+        overwrite = bool(general_options["overwrite"])
+    elif "clear_start" in general_options:
+        logger.warning("general_options 'clear_start' is deprecated; rename it to 'overwrite'.")
+        overwrite = bool(general_options["clear_start"])
+    else:
+        overwrite = False
 
-    if folder_simulation is None or not os.path.exists(folder_simulation):
-        logger.error(
-            "Basement simulation folder not specified. Please provide the path to the simulation folder in: user_defined_configs/constants.py"
-        )
-        raise ValueError(
-            "Basement simulation folder not specified. Please provide the path to the simulation folder in: user_defined_configs/constants.py"
-        )
+    folder_simulation = prepare_simulation_folder(c.SIMULATION_CONFIG_FOLDER, folder_output, overwrite, logger)
 
     if folder_support is None or not os.path.exists(folder_support):
         logger.error(
@@ -189,7 +282,8 @@ def setup_directories(project_path, user_options, logger):
     return {
         "path_project": project_path,
         "folder_ground_truth": folder_ground_truth,
-        "folder_simulation": folder_simulation,
+        "folder_simulation": str(folder_simulation),
+        "folder_simulation_configs": c.SIMULATION_CONFIG_FOLDER,
         "folder_mesh": folder_mesh,
         "folder_centroids": folder_centroids,
         "folder_output": folder_output,

@@ -1,7 +1,7 @@
 @echo off
 :: Runs BOAR from the project root on Windows (Linux / macOS: run_boar.sh).
 :: Copy the project folder to run several calibrator instances side by side; each copy runs from its own root.
-:: BOAR itself generates setup.h5 from model.json and runs BASEMENT, using 'basement_version' in
+:: BOAR copies simulation_configs/*.json to output/<simulation_name>/, generates setup.h5 there and runs BASEMENT, using 'basement_version' in
 :: user_defined_configs/user_options.yaml (default 4.3) or BASEMENT_PATH in user_defined_configs/constants.py.
 ::
 :: Usage: run_boar.bat [boar.py options, e.g. --log-file my_run.log]

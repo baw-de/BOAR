@@ -47,8 +47,33 @@ data. The typical running instance has the following directory structure:
        ├── meshes/
        │   ├── mesh1_.2dm
        │   └── mesh2_.2dm
-       ├── simulation/
+       ├── simulation_configs/              # Original BASEMENT configuration, never modified by BOAR
+       │   ├── model.json                   # SETUP.simulation_name names the output folder
+       │   ├── simulation.json
+       │   └── results.json
+       ├── output/
+       │   └── <simulation_name>/           # Run folder: copied JSON files, setup.h5, results.h5,
+       │                                    # optimization_memory.csv, tried_vectors/
        └── boar.py
+
+BOAR calibrates one case at a time. It only reads the files in ``simulation_configs/``. Each run copies them
+to ``output/<simulation_name>/``, and all simulations run on that copy. The name is BASEMENT's own
+``simulation_name`` entry in the ``SETUP`` section of ``model.json``:
+
+.. code-block:: json
+
+   {
+       "SETUP": {
+           "simulation_name": "my_case",
+           "...": "..."
+       }
+   }
+
+In the copy, relative ``mesh_file`` and
+``discharge_file`` paths are made absolute: they are resolved against ``simulation_configs/`` and then the
+project root. If ``general_options.overwrite`` is ``True``, ``output/<simulation_name>/`` is deleted before the
+run. If it is ``False``, the earlier ``optimization_memory.csv`` is kept and the calibration resumes. The
+JSON files are always copied fresh from the originals, so the run starts from the original friction values.
 
 Several instances of BOAR can be run in parallel. It is recommended to use
 different coding instances, such that the aforementioned directory structure

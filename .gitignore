@@ -154,11 +154,17 @@ marimo/_static/
 marimo/_lsp/
 __marimo__/
 
-# User data
-ground_truth/
+# User data: folder contents stay local, the empty folders are kept through .gitkeep
+ground_truth/*
 !ground_truth/.gitkeep
-simulation/
-!simulation/.gitkeep
+simulation_configs/*
+!simulation_configs/.gitkeep
+meshes/*
+!meshes/.gitkeep
+support_files/*
+!support_files/.gitkeep
+output/*
+!output/.gitkeep
 benchmarks/*.txt
 
 # Development and testing

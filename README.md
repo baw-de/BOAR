@@ -93,7 +93,7 @@ BOAR can also be started directly with `uv run boar.py [--log-file my_run.log]` 
 
 ### Output
 
-BOAR writes results to the output directory defined in `user_options.yaml`. A log file (`boar.log` by default) is created in the project root and records the full calibration history.
+BOAR never modifies the original BASEMENT configuration in `simulation_configs/` (`model.json`, `simulation.json`, `results.json`). Each run copies it to `output/<simulation_name>/`, where `simulation_name` is the `SETUP.simulation_name` entry of `model.json`. All files the run produces go there: `setup.h5`, `results.h5`, `optimization_memory.csv` and `tried_vectors/`. With `overwrite: True` in `general_options`, that folder is deleted before the run. With `False`, the run resumes from its `optimization_memory.csv`. A log file (`boar.log` by default) is created in the project root and records the full calibration history.
 
 ## Building the docs
 

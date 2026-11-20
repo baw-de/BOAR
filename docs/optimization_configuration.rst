@@ -14,7 +14,7 @@ The ``general_options`` section controls basic BOAR behavior.
 .. code-block:: yaml
 
    general_options:
-     'clear_start': True       # [bool] Re-create output directory on start
+     'overwrite': True         # [bool] Delete output/<simulation_name>/ before the run (False: resume from its optimization_memory.csv)
      'silent': True            # [bool] Suppress log messages
      'log_dev': False          # [bool] Print all logs including simulation logs
 

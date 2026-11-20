@@ -45,7 +45,10 @@ which BASEMENT stores differently from version to version:
 | 4.3     | ``RESULTS/CellsAll/BottomEl/<time>`` (one dataset per output) |
 +---------+-------------------------------------------------------------+
 
-Set it to the version installed at ``BASEMENT_PATH`` (``user_defined_configs/constants.py``).
+The same setting selects the BASEMENT programs BOAR runs: on Windows those in
+``C:\Program Files\BASEMENT <version>.0\bin`` (e.g. ``C:\Program Files\BASEMENT 4.3.0\bin``), on Linux those in
+``/usr/bin``. Setting ``BASEMENT_PATH`` in ``user_defined_configs/constants.py`` overrides the folder;
+it must then hold the version set here.
 If it does not match the results, BOAR stops with an error that names the version
 the file appears to come from.
 

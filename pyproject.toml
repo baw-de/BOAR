@@ -102,4 +102,5 @@ python_files = ["test_*.py", "*_test.py"]
 python_functions = ["test_*"]
 markers = [
     "slow: long-running end-to-end benchmark runs (deselected by default)",
+    "requires_basement: runs the installed BASEMENT programs; skipped where BASEMENT is not installed (e.g. GitHub CI)",
 ]

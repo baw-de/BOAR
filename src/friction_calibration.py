@@ -21,7 +21,6 @@ from src import bo_optimizer as bo
 from src import functions_sampler, utils
 
 # Import user defined functions
-from user_defined_configs import constants as c
 from user_defined_configs import function_loss as lf
 
 
@@ -179,7 +178,7 @@ class FrictionCalibration:
             "precision": precision,
             "save_tried_vectors": save_tried_vectors,
             ## Basement arguments
-            "basement_path": c.BASEMENT_PATH,
+            "basement_path": self.sim_manager.basement_path,
             "nthreads": args_basement.get("nthreads", -1),
             "backend": args_basement.get("backend", "omp"),
             "basement_version": args_basement.get("basement_version", bmt.DEFAULT_BASEMENT_VERSION),
@@ -502,6 +501,11 @@ def main(data: dict, paths: dict, user_opts: dict) -> None:
 
     # Creates the calibrator instance
     calibrator = FrictionCalibration(data, folder_simulation, user_opts, logger)
+
+    # Generate setup.h5 from model.json (with the initial friction written above) before the first iteration,
+    # which writes friction into setup.h5. Uses the BASEMENT version set in basement_options.
+    utils.write_log(logger, "Generating setup.h5 from model.json.")
+    calibrator.sim_manager.run_setup()
 
     if user_opts["optimization_variable_options"].get("opt_engine", "boar") == "boar":
         sampler = functions_sampler.LatinHypercube(

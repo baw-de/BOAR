@@ -43,6 +43,8 @@ source .venv/bin/activate        # Windows: .venv\Scripts\activate
 pip install -e .
 ```
 
+BOAR calls BASEMENT's `BMv4_setup`, `BMv4_simulation` and `BMv4_results` from the install folder of `basement_version` in `basement_options` (default `"4.3"`): `C:\Program Files\BASEMENT <version>.0\bin` on Windows (e.g. `C:\Program Files\BASEMENT 4.3.0\bin`) and `/usr/bin` on Linux, where the BASEMENT Ubuntu package (`sudo apt install ./<downloaded BASEMENT package>.deb`) installs them. If BASEMENT is installed somewhere else, set `BASEMENT_PATH` in [`user_defined_configs/constants.py`](user_defined_configs/constants.py) to that folder.
+
 For development (linting, tests, docs):
 ```bash
 pip install -e ".[dev]"
@@ -71,30 +73,20 @@ Edit this file before running BOAR. The key sections are:
 
 ## Running BOAR
 
-### Linux / macOS
+Ready-to-use launchers are provided: [`run_boar.bat`](run_boar.bat) (Windows) and [`run_boar.sh`](run_boar.sh) (Linux / macOS). They run `boar.py` from the project root with the Python of `.venv` (otherwise `python` / `python3` on the PATH; set `PYTHON_EXE` to use another one) and pass their options on. There is nothing to adjust in them: BOAR itself generates `setup.h5` from `model.json` and runs BASEMENT of the version set in `basement_options`.
 
 ```bash
-# Run with default log file (boar.log)
-python boar.py
-
-# Run with a custom log file
-python boar.py --log-file my_run.log
-```
-
-### Windows
-
-A ready-to-use batch script is provided. Before the first run, open [`run_boar.bat`](run_boar.bat) and adjust:
-
-- `PYTHON_EXE` — path to your Python executable inside the virtual environment
-- `SETUP_EXE` — path to the BASEMENT `BMv4_BASEHPC_setup.exe`
-- `SIM_DIR` — path to the directory containing your `model.json` and simulation files
-
-Then launch via:
-```bat
+# Windows
 run_boar.bat
+run_boar.bat --log-file my_run.log         # custom log file (default: boar.log)
+
+# Linux / macOS
+chmod +x run_boar.sh                       # once, if the file is not executable
+./run_boar.sh
+./run_boar.sh --log-file my_run.log
 ```
 
-The batch script will regenerate `setup.h5` from `model.json` and start the calibration automatically.
+BOAR can also be started directly with `python boar.py [--log-file my_run.log]`. To run several instances side by side, copy the project folder; each copy runs from its own root.
 
 ### Output
 

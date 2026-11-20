@@ -1,20 +1,35 @@
-:: This batch file is designed to set up the environment and run the main Python script for a project that uses BASEMENT 4.2.0 for simulation.
-:: It allows the user to copy and paste instances of the calibrator code and seamlessly run the simulation without needing to worry about the underlying setup.
-:: Make sure to adjust the paths for the Python executable and the BASEHPC setup executable as needed before running this batch file, and replicating it for multiple instances if necessary.
+@echo off
+:: Runs BOAR from the project root on Windows (Linux / macOS: run_boar.sh).
+:: Copy the project folder to run several calibrator instances side by side; each copy runs from its own root.
+:: BOAR itself generates setup.h5 from model.json and runs BASEMENT, using 'basement_version' in
+:: user_defined_configs/user_options.yaml (default 4.3) or BASEMENT_PATH in user_defined_configs/constants.py.
+::
+:: Usage: run_boar.bat [boar.py options, e.g. --log-file my_run.log]
 
 setlocal
 
+:: Resolve the project root to an absolute path without a trailing backslash.
 set "PROJECT_ROOT=%~dp0"
 for %%I in ("%PROJECT_ROOT%.") do set "PROJECT_ROOT=%%~fI"
-set "SIM_DIR=%PROJECT_ROOT%\simulation"  :: This assumes that the simulation directory is located at the root of the project. Adjust if necessary.
-set "PYTHON_EXE=ADD THE PATH TO YOUR PYTHON.EXE OR VENV HERE" :: Example: C:\Users\YourUsername\Envs\YourEnv\Scripts\python.exe
-set "SETUP_EXE=C:\Program Files\BASEMENT 4.2.0\bin\BMv4_BASEHPC_setup.exe" :: Adjust the path to the BASEHPC setup executable if it's different on your system.
 
-:: Optional - This command generates the setup.h5 file from the model.json file.
-if exist "%SIM_DIR%\setup.h5" del "%SIM_DIR%\setup.h5"
-"%SETUP_EXE%" --file "%SIM_DIR%\model.json" --output "%SIM_DIR%\setup.h5"
-:: End Optional steps
+:: BOAR reads user_defined_configs/ relative to the project root, so run from there.
+cd /d "%PROJECT_ROOT%"
 
-"%PYTHON_EXE%" "%PROJECT_ROOT%\boar.py"
+:: Python of the virtual environment. Set PYTHON_EXE beforehand to use another one.
+if not defined PYTHON_EXE set "PYTHON_EXE=%PROJECT_ROOT%\.venv\Scripts\python.exe"
 
-endlocal
+if exist "%PYTHON_EXE%" goto :run
+
+:: Fallback: python on the PATH.
+where python >nul 2>nul
+if %errorlevel% neq 0 (
+	echo ERROR: Python was not found:
+	echo   "%PYTHON_EXE%"
+	echo Create .venv ^(python -m venv .venv ^&^& .venv\Scripts\pip install -e .^) or set PYTHON_EXE.
+	exit /b 1
+)
+set "PYTHON_EXE=python"
+
+:run
+"%PYTHON_EXE%" "%PROJECT_ROOT%\boar.py" %*
+exit /b %errorlevel%

@@ -100,9 +100,12 @@ directory in your terminal and execute the following command:
 
 .. code-block:: bash
 
-   run_boar.bat
+   run_boar.bat      # Windows
+   ./run_boar.sh     # Linux / macOS
 
-or
+Both scripts run ``boar.py`` with the Python of ``.venv`` (otherwise the one on the PATH; set
+``PYTHON_EXE`` to use another one) and pass their options on. BOAR itself generates ``setup.h5`` from
+``model.json`` and runs the BASEMENT version set in ``basement_options``. Instead of the scripts, you can also run
 
 .. code-block:: bash
 

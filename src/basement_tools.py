@@ -22,6 +22,7 @@ import json
 import logging
 import os
 import subprocess  # nosec B404 – required for BASEMENT CLI invocation
+import sys
 from typing import Any
 
 import h5py
@@ -37,6 +38,26 @@ DEFAULT_BASEMENT_VERSION = "4.3"
 #   4.2: static dataset   CellsAll/BottomEl
 #   4.3: one per output   RESULTS/CellsAll/BottomEl/<time key>
 SUPPORTED_BASEMENT_VERSIONS = ((4, 2), (4, 3))
+# BASEMENT executables are named BMv4_*.exe on Windows and BMv4_* on Linux.
+EXE_SUFFIX = ".exe" if sys.platform == "win32" else ""
+
+
+def default_basement_path(version: tuple[int, int]) -> str:
+    """
+    Default BASEMENT installation folder for a ``(major, minor)`` version.
+
+    Windows: ``C:\\Program Files\\BASEMENT <major>.<minor>.0\\bin`` (BASEMENT's installer default).
+    Linux: ``/usr/bin``, where BASEMENT's Ubuntu .deb package installs (one version at a time).
+
+    Args:
+        version: The ``(major, minor)`` BASEMENT version.
+
+    Returns:
+        str: Folder holding the BMv4_* programs.
+    """
+    if sys.platform == "win32":
+        return rf"C:\Program Files\BASEMENT {version[0]}.{version[1]}.0\bin"
+    return "/usr/bin"
 
 
 class SimulationManager:
@@ -84,7 +105,13 @@ class SimulationManager:
         else:
             self.logger = logger
 
-        self.basement_path = c.BASEMENT_PATH
+        # BASEMENT_PATH in constants.py overrides the default folder of the configured version.
+        self.basement_path = c.BASEMENT_PATH or default_basement_path(self.basement_version)
+        utils.write_log(
+            self.logger,
+            f"BASEMENT {'.'.join(map(str, self.basement_version))} programs from: {self.basement_path}",
+            silent=self.silent,
+        )
 
     @staticmethod
     def _parse_basement_version(version: Any) -> tuple[int, int]:
@@ -247,13 +274,13 @@ class SimulationManager:
             Exception: If setup processing fails.
         """
         # Define paths
-        exe_results_path = os.path.join(self.basement_path, "BMv4_setup.exe")
+        exe_results_path = os.path.join(self.basement_path, f"BMv4_setup{EXE_SUFFIX}")
         model_file = os.path.join(self.sim_folder, "model.json")
         setup_file = os.path.join(self.sim_folder, "setup.h5")
 
         # Validate paths
         utils.write_log(self.logger, "Validating required files.", silent=not self.log_dev)
-        required_files = [exe_results_path, setup_file, model_file]
+        required_files = [exe_results_path, model_file]  # setup.h5 is the output, created if missing
         self._validate_paths(required_files, error_message="Required simulation files are missing.")
 
         # Process results if required
@@ -312,7 +339,7 @@ class SimulationManager:
         )
 
         # Define paths
-        exe_sim_path = os.path.join(self.basement_path, "BMv4_simulation.exe")
+        exe_sim_path = os.path.join(self.basement_path, f"BMv4_simulation{EXE_SUFFIX}")
         run_config_file = os.path.join(self.sim_folder, "simulation.json")
         setup_file = os.path.join(self.sim_folder, "setup.h5")
         output_file = os.path.join(self.sim_folder, "results.h5")
@@ -384,7 +411,7 @@ class SimulationManager:
             Exception: If results processing fails.
         """
         # Define paths
-        exe_results_path = os.path.join(self.basement_path, "BMv4_results.exe")
+        exe_results_path = os.path.join(self.basement_path, f"BMv4_results{EXE_SUFFIX}")
         setup_file = os.path.join(self.sim_folder, "setup.h5")
         output_file = os.path.join(self.sim_folder, "results.h5")
         results_config_file = os.path.join(self.sim_folder, "results.json")

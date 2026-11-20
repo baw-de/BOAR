@@ -496,7 +496,7 @@ def main(data: dict, paths: dict, user_opts: dict) -> None:
     folder_simulation = paths["folder_simulation"]
 
     # Removes previous simulation results
-    if user_opts.get("cleanup", True):
+    if user_opts.get("basement_options", {}).get("cleanup", True):
         utils.simulation_cleanup(folder_simulation)
 
     # Creates the calibrator instance

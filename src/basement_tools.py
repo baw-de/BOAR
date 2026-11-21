@@ -487,10 +487,10 @@ class SimulationManager:
                 - time: Simulation time in seconds
                 - centroids: Cell centroids array
                 - hyd: Hydrodynamic data (wse, qx, qy, h, ux, uy)
-                - rey: Reynolds state data
-                - trb: Turbulence state data
-                - turb_k: Turbulent kinetic energy
-                - turb_rey: Turbulent Reynolds stress
+                - rey: Reynolds state data (None without a TURBULENCE block)
+                - trb: Turbulence state data (None without a TURBULENCE block)
+                - turb_k: Turbulent kinetic energy (None if not in the results)
+                - turb_rey: Turbulent Reynolds stress (None if not in the results)
 
         Raises:
             FileNotFoundError: If results file is not found.
@@ -526,8 +526,9 @@ class SimulationManager:
                 utils.write_log(self.logger, f"Bottom elevation shape: {bottom_el.shape}", silent=not self.log_dev)
 
                 results_hyd = np.array(cells_all["HydState"][time])  # Hydrodynamic state
-                results_rey = np.array(cells_all["ReyState"][time])  # Reynolds state
-                results_trb = np.array(cells_all["TrbState"][time])  # Turbulence state
+                # Turbulence states exist only when model.json has a TURBULENCE block; otherwise None.
+                results_rey = np.array(cells_all["ReyState"][time]) if "ReyState" in cells_all else None
+                results_trb = np.array(cells_all["TrbState"][time]) if "TrbState" in cells_all else None
 
             with h5py.File(results_aux_file, "r") as h5file:
                 # Process saving times and extract relevant data
@@ -544,8 +545,9 @@ class SimulationManager:
                         raise ValueError(f"Simulation time {sim_time} not found in saving times.")
                     time = saving_times_ids[saving_times.index(sim_time)]
                 results_velocity = np.array(h5file["flow_velocity"][time])  # Hydrodynamic state
-                results_turb_k = np.array(h5file["turb_k"][time])  # Reynolds state
-                results_turb_rey = np.array(h5file["turb_reynolds"][time])  # Turbulence state
+                # Turbulence outputs exist only with a TURBULENCE block (and turb_k/turb_reynolds in OUTPUT).
+                results_turb_k = np.array(h5file["turb_k"][time]) if "turb_k" in h5file else None
+                results_turb_rey = np.array(h5file["turb_reynolds"][time]) if "turb_reynolds" in h5file else None
 
         except Exception as e:
             utils.write_log(self.logger, f"Error accessing or processing results file: {e}", level="error")

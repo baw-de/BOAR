@@ -61,7 +61,8 @@ def read_mesh_file(filepath: str) -> MeshData:
                 # Parse NS: ND1 ND2 ... -ND_n NAME
                 parts = line.split()
                 set_name = parts[-1]
-                node_ids = [int(x) for x in parts[1:-1] if not x.startswith("-")]
+                # A minus sign marks the last node of the string; keep that node (as its absolute id)
+                node_ids = [abs(int(x)) for x in parts[1:-1]]
                 node_sets[set_name] = np.array(node_ids, dtype=int)
             elif line.startswith("MESH2D") or line.startswith("MESHNAME") or line.startswith("NUM_MATERIALS_PER_ELEM"):
                 # Skip header lines

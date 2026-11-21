@@ -28,8 +28,8 @@ def _bed(step: int) -> np.ndarray:
     return np.full((N_CELLS, 1), 1.0 + 0.1 * step)
 
 
-def _write_results(folder, version: str) -> None:
-    """Write a minimal results.h5 / results_aux.h5 pair in the layout of ``version``."""
+def _write_results(folder, version: str, turbulence: bool = True) -> None:
+    """Write a minimal results.h5 / results_aux.h5 pair in the layout of ``version`` (turbulence optional)."""
     with h5py.File(folder / "results.h5", "w") as f:
         if version == "4.2":
             f["CellsAll/BottomEl"] = _bed(0)
@@ -37,8 +37,9 @@ def _write_results(folder, version: str) -> None:
             key = f"{step:07d}"
             wse = _bed(step)[:, 0] + 0.5  # water depth 0.5 everywhere
             f[f"RESULTS/CellsAll/HydState/{key}"] = np.column_stack([wse, np.full(N_CELLS, step), np.zeros(N_CELLS)])
-            f[f"RESULTS/CellsAll/ReyState/{key}"] = np.zeros((N_CELLS, 8))
-            f[f"RESULTS/CellsAll/TrbState/{key}"] = np.zeros((N_CELLS, 6))
+            if turbulence:
+                f[f"RESULTS/CellsAll/ReyState/{key}"] = np.zeros((N_CELLS, 8))
+                f[f"RESULTS/CellsAll/TrbState/{key}"] = np.zeros((N_CELLS, 6))
             if version == "4.3":
                 f[f"RESULTS/CellsAll/BottomEl/{key}"] = _bed(step)
 
@@ -46,8 +47,9 @@ def _write_results(folder, version: str) -> None:
         for step in range(N_OUTPUTS):
             key = str(step)  # aux keys are not zero-padded
             f[f"flow_velocity/{key}"] = np.full((N_CELLS, 2), float(step))
-            f[f"turb_k/{key}"] = np.zeros((N_CELLS, 1))
-            f[f"turb_reynolds/{key}"] = np.zeros((N_CELLS, 2))
+            if turbulence:
+                f[f"turb_k/{key}"] = np.zeros((N_CELLS, 1))
+                f[f"turb_reynolds/{key}"] = np.zeros((N_CELLS, 2))
 
 
 def _manager(folder, version: str) -> bmt.SimulationManager:
@@ -110,6 +112,14 @@ class TestExtractSimData:
         np.testing.assert_allclose(data["hyd"]["ux"], last)  # aux keys sorted numerically ('11', not '9')
         if version == "4.3":
             np.testing.assert_allclose(data["hyd"]["h"], 0.5)  # bed of the same output step
+
+    def test_without_turbulence_model(self, tmp_path):
+        """Without a TURBULENCE block BASEMENT writes no turbulence states; they are returned as None."""
+        _write_results(tmp_path, "4.3", turbulence=False)
+        data = _manager(tmp_path, "4.3").extract_sim_data({}, sim_time=-1)
+        np.testing.assert_allclose(data["hyd"]["h"], 0.5)
+        assert data["rey"] is None and data["trb"] is None
+        assert data["turb_k"] is None and data["turb_rey"] is None
 
     def test_specific_time_v43(self, tmp_path):
         _write_results(tmp_path, "4.3")

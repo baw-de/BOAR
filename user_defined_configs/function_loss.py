@@ -40,7 +40,8 @@ def loss_function(
         gt_numpy = ground_truth.to_numpy()
         sim_cs = {'cx':[], 'cy':[], 'h':[], 'ux':[], 'uy':[]}
 
-        for i, (val_x, val_y, val_h) in enumerate(gt_numpy):
+        # The first two columns are the point coordinates; the measured values are read by name below.
+        for val_x, val_y in gt_numpy[:, :2]:
             # Find the closest simulation cells to the calibration point
             closest_cell_ids, cell_distance = utils.find_closest_cell(
                 simulation_data['centroids'],

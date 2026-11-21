@@ -399,14 +399,7 @@ class BayesianOptimizer:
         best_point = self.sample[idx_best]
         best_value = self.value[idx_best]
 
-        # Updates the simulation with the best point and value
-        utils.write_log(
-            self.logger,
-            "Updating simulation results with best value",
-            "info",
-        )
-        self.obj_func(best_point)
-
+        # The caller simulates the best point again if it needs its results (friction_calibration.main does)
         utils.write_log(
             self.logger,
             f"Optimization completed with {i + 1} iterations.\nBest sample: {best_point} \nBest value: {best_value}",

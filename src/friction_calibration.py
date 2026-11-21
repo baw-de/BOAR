@@ -304,13 +304,15 @@ class FrictionCalibration:
             local_error = np.round(error, 16)
             writer.writerow([local_friction, local_error])
 
-    def objective_function(self, vector: np.ndarray, verbose: bool = True) -> float:
+    def objective_function(self, vector: np.ndarray, verbose: bool = True, rerun: bool = False) -> float:
         """
         Optimization function to minimize the calibration error.
 
         Args:
             vector (np.ndarray): Array containing the friction values.
             verbose (bool): If True, the function will print the current friction vector and the corresponding calibration error.
+            rerun (bool): Simulate the vector even if the optimization memory holds it, without adding it to the
+                memory again (used to leave the results of the best vector in the run folder).
 
         Returns:
             float: The calibration error.
@@ -326,8 +328,8 @@ class FrictionCalibration:
         if verbose:
             utils.write_log(self.logger, f"Current vector (rounded): {vector}", "info")
 
-        # Search the optimization memory for the current friction values
-        val_error = self.opt_memory(vector, search=True)
+        # Search the optimization memory for the current friction values (a rerun simulates anyway)
+        val_error = 0 if rerun else self.opt_memory(vector, search=True)
 
         # If the error is not found in the memory, run the simulation
         if val_error != 0:
@@ -362,7 +364,8 @@ class FrictionCalibration:
             if run_status == 1:
                 utils.write_log(self.logger, "Mass conservation error detected. Returning high error value.", "error")
                 val_error = 1e6  # Return a high error value for mass conservation errors
-                self.opt_memory(vector, val_error)
+                if not rerun:
+                    self.opt_memory(vector, val_error)
                 return val_error
 
             # Extract simulation data
@@ -407,8 +410,9 @@ class FrictionCalibration:
         if verbose:
             utils.write_log(self.logger, f"Friction vector: {vector}; Loss: {val_error}", "info")
 
-        # Write the trial and error to a csv file
-        self.opt_memory(vector, val_error)
+        # Write the trial and error to a csv file (a rerun is already in it)
+        if not rerun:
+            self.opt_memory(vector, val_error)
 
         return val_error
 
@@ -745,6 +749,18 @@ def main(data: dict, paths: dict, user_opts: dict) -> dict:
 
     best_vector, best_error, n_iter_best = best_from_memory(folder_simulation)
     utils.write_log(logger, f"Best vector {best_vector}, error {best_error}, found at evaluation {n_iter_best}.")
+
+    # The run folder holds the results of the last simulated vector: simulate the best one once more, so that
+    # results.h5 (and results_aux.h5, results.xdmf) belong to it. The memory is not changed.
+    utils.write_log(logger, f"Running the best vector {best_vector} once more for the results in the run folder.")
+    rerun_error = calibrator.objective_function(np.asarray(best_vector, dtype=float), rerun=True)
+    if not np.isclose(rerun_error, best_error, rtol=1e-6, atol=1e-12):
+        utils.write_log(
+            logger,
+            f"The rerun of the best vector gave error {rerun_error}, the memory {best_error}: the simulation is not "
+            "reproducible (the summary keeps the memory value).",
+            "warning",
+        )
     return {
         "best_vector": best_vector,
         "best_error": best_error,

@@ -1251,6 +1251,17 @@ def run_batch(basement_version: str = bmt.DEFAULT_BASEMENT_VERSION, gpu: bool = 
         checks["template replicated with Q001.txt"] = bool(inflow) and all(
             Path(bc.get("discharge_file", "")).name == f"{DISCHARGE_CODE}.txt" for bc in inflow
         )
+        # The run folder ends with the best vector (simulated once more after the optimization)
+        friction_columns = [col for col in summary.columns if col.startswith("friction_")]
+        holds_best = []
+        for _, row in summary.iterrows():
+            model = json.loads(
+                next((output / f"{row['scenario']}_{row['discharge']}").glob("*/model.json")).read_text()
+            )
+            regions = model["SETUP"]["BASEHPC"]["BASEPLANE_2D"]["HYDRAULICS"]["FRICTION"]["regions"]
+            in_folder = {f"friction_{r['region_name']}": float(r["friction"]) for r in regions}
+            holds_best.append(all(np.isclose(in_folder[col], row[col]) for col in friction_columns))
+        checks["run folders hold the best vector"] = all(holds_best)
         if label != "serial (1 CPU)" and "serial (1 CPU)" in runs and n_gpu == 0:
             reference = runs["serial (1 CPU)"]["summary"]
             columns = [col for col in summary.columns if col.startswith("friction_")] + ["best_error", "n_iter_best"]

@@ -437,12 +437,22 @@ class SimulationManager:
 
         # Process results if required
         try:
-            results_command = [exe_results_path, results_config_file, output_file, "--output", results_output_file]
+            # Run inside the run folder with relative file names: results.xdmf then points to results.h5 and
+            # results_aux.h5 by relative paths, so the run folder can be moved or copied and still opens in ParaView
+            results_command = [
+                exe_results_path,
+                os.path.basename(results_config_file),
+                os.path.basename(output_file),
+                "--output",
+                os.path.basename(results_output_file),
+            ]
             utils.write_log(self.logger, f"Results command: {results_command}", level="debug", silent=not self.log_dev)
 
             utils.write_log(self.logger, "Starting results processing...", silent=not self.log_dev)
             command, env = self._launch(results_command)
-            proc_results = subprocess.run(command, shell=False, capture_output=True, text=True, env=env)  # nosec B603 – args are validated file paths from os.path.join/config
+            proc_results = subprocess.run(
+                command, shell=False, capture_output=True, text=True, env=env, cwd=self.sim_folder
+            )  # nosec B603 – args are validated file paths from os.path.join/config
 
             if proc_results.stdout:
                 utils.write_log(self.logger, proc_results.stdout.strip(), level="info", silent=not self.log_dev)

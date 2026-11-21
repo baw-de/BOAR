@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import types
 from pathlib import Path
 
 import pandas as pd
@@ -14,7 +15,7 @@ from src import friction_calibration as fc
 from src import functions_io as fio
 from src.cpu_topology import GpuInfo, NumaNode, Placement
 from tests.test_cpu_topology import core_record, numa_record
-from tests.test_functions_io import MESH, _model
+from tests.test_functions_io import MESH, _model, config_folder  # noqa: F401  (pytest fixture)
 
 LOGGER = logging.getLogger("test_batch")
 
@@ -414,3 +415,25 @@ def test_restart_skips_finished_single_case(project, capsys):
     assert "finished in an earlier run and is not run again" in capsys.readouterr().out
     summary = pd.read_csv(project["OUTPUT_FOLDER"] / batch.SUMMARY_FILE_NAME)
     assert summary.loc[0, "device"] == "earlier-run"
+
+
+# ── Results files ────────────────────────────────────────────────────────────────────────────────────
+def test_results_processing_writes_relative_paths(config_folder, tmp_path, monkeypatch):  # noqa: F811
+    """BMv4_results runs inside the run folder with relative names, so results.xdmf points to results.h5 relatively."""
+    from src import basement_tools as bmt
+
+    case = fio.prepare_simulation_folder(config_folder, tmp_path / "output", overwrite=True, logger=LOGGER)
+    manager = bmt.SimulationManager(str(case), {"basement_version": "4.3"}, logger=LOGGER, silent=True)
+    monkeypatch.setattr(manager, "_validate_paths", lambda *args, **kwargs: None)
+    calls = []
+
+    def fake_run(command, **kwargs):
+        calls.append((command, kwargs))
+        return types.SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(bmt.subprocess, "run", fake_run)
+    manager.run_results_processing()
+
+    ((command, kwargs),) = calls
+    assert command[1:] == ["results.json", "results.h5", "--output", "results.xdmf"]
+    assert Path(kwargs["cwd"]) == case

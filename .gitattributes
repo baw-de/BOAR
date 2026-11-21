@@ -1,3 +1,18 @@
 # Shell scripts must keep LF endings to run on Linux; batch files use CRLF.
 *.sh text eol=lf
 *.bat text eol=crlf
+
+# Images are binary: no text diff, no merge, no line-ending changes, so they do not count as line changes.
+# Text-based formats (SVG, EPS) would otherwise be diffed line by line.
+*.svg binary
+*.eps binary
+*.pdf binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.bmp binary
+*.tif binary
+*.tiff binary
+*.ico binary
+*.webp binary

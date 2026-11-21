@@ -48,3 +48,15 @@ preferred-citation:
   issn: "2352-7110"
   doi: "10.1016/j.softx.2026.102899"
   url: "https://www.sciencedirect.com/science/article/pii/S2352711026003900"
+# Software BOAR includes code from (see THIRD_PARTY_NOTICES.md)
+references:
+  - type: software
+    title: "capiQ: Computational Automation Pipeline for Hydro-morphodynamic simulation Queues"
+    authors:
+      - family-names: "Oliveira"
+        given-names: "Luiz"
+        affiliation: "Institute for Water and Environment (IWU), Karlsruhe Institute of Technology (KIT)"
+        orcid: "https://orcid.org/0000-0002-5734-8337"
+    repository-code: "https://github.com/KIT-IWU-HydroEng/capiQ"
+    version: 0.1.0
+    license: MIT

@@ -459,26 +459,16 @@ class FrictionCalibration:
                 )
                 init_vector = np.clip(init_vector, self.opt_args["bounds"][i][0], self.opt_args["bounds"][i][1])
 
-        # Check if the initial vector is already in the memory
-        if len(lhs_samples) == 0:
-            init_error = self.objective_function(init_vector)
-            lhs_samples = np.vstack([lhs_samples, init_vector])
-            lhs_values = np.append(lhs_values, init_error)
-
+        # Evaluate the initial vector unless the memory (of an earlier run) already holds it
+        quantized_init = self._quantize_vector(init_vector)
+        if any(np.isclose(quantized_init, value).all() for value in lhs_samples):
+            utils.write_log(
+                self.logger, "Initial vector is already in the memory. Using the stored value instead.", "info"
+            )
         else:
-            for i, value in enumerate(lhs_samples):
-                if (init_vector == value).all():
-                    utils.write_log(
-                        self.logger,
-                        "Initial vector is already in the memory. Using the stored value instead.",
-                        "warning",
-                    )
-                    init_error = lhs_values[i]
-
-                if i == len(lhs_samples) - 1:
-                    init_error = self.objective_function(init_vector)
-                    lhs_samples = np.vstack([lhs_samples, init_vector])
-                    lhs_values = np.append(lhs_values, init_error)
+            init_error = self.objective_function(init_vector)
+            lhs_samples = np.vstack([lhs_samples, quantized_init])
+            lhs_values = np.append(lhs_values, init_error)
 
         if len(lhs_samples) < self.opt_args["n_initial"]:
             utils.write_log(self.logger, "Stored samples are lower than the minimum. Generating new LHS samples...")
@@ -493,14 +483,93 @@ class FrictionCalibration:
         return lhs_samples, lhs_values
 
 
-def main(data: dict, paths: dict, user_opts: dict) -> None:
+def best_from_memory(sim_folder: str | os.PathLike) -> tuple[list[float], float, int]:
+    """
+    Best friction vector of a calibration, read from its optimization_memory.csv.
+
+    Every evaluation of both engines (boar, optuna) is appended to the memory in the order it was run, so the
+    row number of the best error is the number of evaluations until the best error was found.
+
+    Args:
+        sim_folder: Run folder holding optimization_memory.csv.
+
+    Returns:
+        tuple: (best vector, best error, n_iter_best), where n_iter_best is the 1-based row of the first
+        minimum error (a resumed run also counts the evaluations of the earlier runs).
+
+    Raises:
+        FileNotFoundError: No memory file.
+        ValueError: The memory file holds no evaluation.
+    """
+    memory_file_path = os.path.join(sim_folder, "optimization_memory.csv")
+    with open(memory_file_path) as file:
+        rows = list(csv.reader(file))[1:]
+    rows = [row for row in rows if row]
+    if not rows:
+        raise ValueError(f"{memory_file_path} holds no evaluation.")
+    errors = np.array([float(row[1]) for row in rows])
+    best = int(np.argmin(errors))
+    vector = [float(v) for v in ast.literal_eval(rows[best][0])]
+    return vector, float(errors[best]), best + 1
+
+
+def resume_state(errors, n_initial: int, opt_args: dict) -> tuple[int, int, bool]:
+    """
+    Where an earlier run of the "boar" engine stopped, from the errors in its optimization memory.
+
+    The first ``n_initial`` evaluations are the initial samples; every later one is one iteration of the
+    Bayesian optimization. The stopping rules of ``BayesianOptimizer.optimize`` are replayed on them.
+
+    Args:
+        errors: Calibration errors of the memory, in evaluation order.
+        n_initial: Number of initial samples.
+        opt_args: Optimization options (max_tested_vectors, max_no_improvement, tolerance).
+
+    Returns:
+        tuple: (iterations done, iterations without improvement at the end, finished).
+    """
+    errors = [float(e) for e in errors]
+    if len(errors) <= n_initial:
+        return 0, 0, False
+    best = min(errors[:n_initial])
+    no_improvement = 0
+    iterations = errors[n_initial:]
+    for done, error in enumerate(iterations, start=1):
+        if error <= opt_args["tolerance"]:
+            return done, no_improvement, True
+        if error < best:
+            best, no_improvement = error, 0
+        else:
+            no_improvement += 1
+        if no_improvement >= opt_args["max_no_improvement"]:
+            return done, no_improvement, True
+    done = len(iterations)
+    return done, no_improvement, done >= opt_args["max_tested_vectors"]
+
+
+def _region_names(calibrator: "FrictionCalibration", n_values: int) -> list[str]:
+    """Names of the calibrated regions: the ``regions`` option, else the region ids of the model."""
+    regions = calibrator.opt_args.get("regions")
+    if regions and len(regions) == n_values:
+        return [str(r) for r in regions]
+    vector_0 = calibrator.opt_args.get("vector_0")
+    if vector_0 is not None and len(vector_0) == n_values:
+        return [str(r) for r in vector_0["region"]]
+    return [str(i) for i in range(n_values)]
+
+
+def main(data: dict, paths: dict, user_opts: dict) -> dict:
     """
     This function orchestrates the calibration process. It initializes the calibrator class, sets up the sampler and the Bayesian optimizer, and runs the calibration.
 
     Parameters:
         data (dict): Dictionary containing the simulation data.
         paths (dict): dictionary containing all relevant paths
-        main_args (dict): Additional arguments for file saving.
+        user_opts (dict): The user options.
+
+    Returns:
+        dict: ``best_vector``, ``best_error``, ``n_iter_best`` (see :func:`best_from_memory`) and
+        ``region_names``.
     """
     # Create a logger
     logger = logging.getLogger(__name__)
@@ -541,7 +610,13 @@ def main(data: dict, paths: dict, user_opts: dict) -> None:
             logger=logger,
         )
 
-        best_sample, _ = bo_method.optimize()
+        # An interrupted calibration continues its budget (the memory holds the evaluations in order)
+        start_iteration, no_improvement, finished = resume_state(
+            initialization[1], calibrator.opt_args["n_initial"], calibrator.opt_args
+        )
+        best_sample, _ = bo_method.optimize(
+            start_iteration=start_iteration, no_improvement=no_improvement, finished=finished
+        )
 
     elif user_opts["optimization_variable_options"].get("opt_engine", "boar") == "optuna":
         bounds = calibrator.opt_args.get("bounds", None)
@@ -667,3 +742,12 @@ def main(data: dict, paths: dict, user_opts: dict) -> None:
         raise ValueError(
             f"Invalid optimization engine specified: {user_opts['optimization_variable_options'].get('opt_engine', 'boar')}. Supported engines are 'boar' and 'optuna'."
         )
+
+    best_vector, best_error, n_iter_best = best_from_memory(folder_simulation)
+    utils.write_log(logger, f"Best vector {best_vector}, error {best_error}, found at evaluation {n_iter_best}.")
+    return {
+        "best_vector": best_vector,
+        "best_error": best_error,
+        "n_iter_best": n_iter_best,
+        "region_names": _region_names(calibrator, len(best_vector)),
+    }

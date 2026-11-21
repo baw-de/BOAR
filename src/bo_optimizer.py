@@ -225,7 +225,7 @@ class BayesianOptimizer:
 
         return optimizer_callable
 
-    def optimize(self, return_attempted_points=False):
+    def optimize(self, return_attempted_points=False, start_iteration=0, no_improvement=0, finished=False):
         """
         Perform Bayesian Optimization to find optimal parameters.
 
@@ -235,8 +235,15 @@ class BayesianOptimizer:
             3. Updates the GP model with new observations.
             4. Stops when tolerance is reached or max iterations exceeded.
 
+        A calibration resumed from its optimization memory continues its budget: ``start_iteration`` iterations of
+        ``max_tested_vectors`` are already done and ``no_improvement`` of them since the last improvement (see
+        ``friction_calibration.resume_state``); ``finished`` skips the search.
+
         Args:
             return_attempted_points: If True, return all attempted points.
+            start_iteration: Iterations already done in an earlier run of this calibration.
+            no_improvement: Iterations without improvement at the end of the earlier run.
+            finished: The earlier run already stopped (budget, tolerance or no improvement).
 
         Returns:
             Tuple: (best_point, best_value) or (best_point, best_value, attempted_points)
@@ -260,9 +267,9 @@ class BayesianOptimizer:
 
         utils.write_log(self.logger, f"Initial best point: {best_point}, value: {best_value}", "info")
 
-        # Start counters
+        # Start counters (continued from an earlier run when resuming)
         attempted_points = []
-        no_improvement_iterations = 0
+        no_improvement_iterations = no_improvement
 
         # Generate fixed candidate population (auto-sized from bounds, precision and constraints when None)
         X_candidates = build_candidate_population(
@@ -276,7 +283,21 @@ class BayesianOptimizer:
         # Extract the Exploration-Exploitation parameter for Expected Improvement
         xi = self.opt_args.get("EI_exploration-exploitation", 0.01)
 
-        for i in range(self.opt_args["max_tested_vectors"]):
+        # Resume: the seed advances twice per iteration, as in the uninterrupted run
+        if start_iteration or no_improvement or finished:
+            if self.sampler.seed is not None:
+                self.sampler.seed += 2 * start_iteration
+            state = "already finished" if finished else f"{no_improvement} without improvement"
+            utils.write_log(
+                self.logger,
+                f"Resuming the optimization: {start_iteration} of {self.opt_args['max_tested_vectors']} iterations "
+                f"done in an earlier run ({state}).",
+                "info",
+            )
+
+        i = start_iteration - 1
+        iterations = range(0) if finished else range(start_iteration, self.opt_args["max_tested_vectors"])
+        for i in iterations:
             utils.write_log(self.logger, f"Iteration {i + 1} of {self.opt_args['max_tested_vectors']}.", "info")
 
             if self.sampler.seed is not None:

@@ -52,6 +52,15 @@ BibTeX:
    }
 
 
+Acknowledgements
+==================
+
+The placement of parallel batch runs on CPU sockets and GPUs (``src/cpu_topology.py``) and parts of the batch
+queue (``src/batch.py``) come from `capiQ <https://github.com/KIT-IWU-HydroEng/capiQ>`_ (Oliveira, L., capiQ:
+Computational Automation Pipeline for Hydro-morphodynamic simulation Queues, version 0.1.0, Karlsruhe Institute
+of Technology), under the MIT License. The license text is in ``THIRD_PARTY_NOTICES.md`` in the repository.
+
+
 Indices and tables
 ==================
 

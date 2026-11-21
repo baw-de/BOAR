@@ -63,9 +63,7 @@ Run:
 from __future__ import annotations
 
 import argparse
-import ast
 import contextlib
-import csv
 import json
 import logging
 import os
@@ -84,7 +82,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 from src import basement_tools as bmt
-from src import cell_centroid, friction_calibration, functions_io, utils
+from src import batch, cell_centroid, friction_calibration, functions_io, utils
 from user_defined_configs import constants as c
 
 Array = np.ndarray
@@ -708,13 +706,23 @@ def depth_errors(sim_data: dict, areas: np.ndarray, points: pd.DataFrame) -> dic
     return {"rmse": float(np.sqrt(np.mean(diff**2))), "max_abs": float(np.max(np.abs(diff)))}
 
 
-def make_depth_loss(areas: np.ndarray):
-    """Benchmark loss for BOAR: mean RMSE of the block-averaged water depth over the ground-truth files."""
+class DepthLoss:
+    """
+    Benchmark loss for BOAR: mean RMSE of the block-averaged water depth over the ground-truth files.
 
-    def depth_loss(simulation_data: dict, ground_truth_data: list) -> tuple[float, None]:
-        return float(np.mean([depth_errors(simulation_data, areas, gt)["rmse"] for gt in ground_truth_data])), None
+    A module-level class (not a closure), so that BOAR's parallel batch workers can receive it.
+    """
 
-    return depth_loss
+    def __init__(self, areas: np.ndarray):
+        self.areas = np.asarray(areas)
+
+    def __call__(self, simulation_data: dict, ground_truth_data: list) -> tuple[float, None]:
+        return float(np.mean([depth_errors(simulation_data, self.areas, gt)["rmse"] for gt in ground_truth_data])), None
+
+
+def make_depth_loss(areas: np.ndarray) -> DepthLoss:
+    """Benchmark loss for BOAR (see :class:`DepthLoss`)."""
+    return DepthLoss(areas)
 
 
 def _analytical_line(case: MacDonaldCase, n: int = 801) -> np.ndarray:
@@ -1019,12 +1027,8 @@ def _run_basement(manager: bmt.SimulationManager, data: dict) -> dict:
 
 def _best_from_memory(case_folder: Path) -> tuple[list[float], float]:
     """Best (friction vector, loss) pair stored in optimization_memory.csv."""
-    with open(case_folder / "optimization_memory.csv") as f:
-        rows = list(csv.reader(f))[1:]
-    vectors = [[float(v) for v in ast.literal_eval(r[0])] for r in rows]
-    losses = [float(r[1]) for r in rows]
-    best = int(np.argmin(losses))
-    return vectors[best], losses[best]
+    vector, loss, _ = friction_calibration.best_from_memory(case_folder)
+    return vector, loss
 
 
 def _report(label: str, errors: dict[str, float], judged: bool = True) -> bool:
@@ -1126,6 +1130,339 @@ def run(
     return result
 
 
+# ── Batch mode ───────────────────────────────────────────────────────────────────────────────────────
+BATCH_FOLDER = ROOT / "output" / "benchmarks" / "swashes_macdonald_batch"
+# Two subcritical cases (the quickest benchmark): one replicates the flat template simulation_configs/model.json,
+# the other has its own simulation_configs/<case>/ folder. Both run the analytical discharge Q001 = 20 m3/s.
+BATCH_CASES = {"TEMPLATE_Q001": "template", "OWN_Q001": "own config"}
+# Quick calibration settings of the batch benchmark (it checks the queue, not the optimizer)
+BATCH_SURROGATE = {"n_initial": 4, "max_tested_vectors": 10, "max_no_improvement": 3, "GPR_iterations": 20}
+
+
+def _start_friction(model: dict, value: float = CALIBRATION_START_N) -> dict:
+    """Set every region of a benchmark model.json to the calibration start value (away from n = 0.03)."""
+    friction = model["SETUP"]["BASEHPC"]["BASEPLANE_2D"]["HYDRAULICS"]["FRICTION"]
+    for region in friction["regions"]:
+        region["friction"] = value
+    return model
+
+
+def write_batch_case(root: Path) -> dict[str, Path]:
+    """
+    Generate the subcritical benchmark in BOAR's batch layout.
+
+    ``simulation_configs/model.json`` is the shared template (used by TEMPLATE_Q001, which has no config folder);
+    ``simulation_configs/OWN_Q001/`` holds a copy with absolute paths and its own simulation name. Every case
+    has its ground truth in ``ground_truth/<case>/``.
+
+    Returns:
+        dict: The project folders (see ``functions_io.default_folders``) plus ``DISCHARGE``.
+    """
+    case = get_case("subcritical")
+    folders = write_case(root, case, "none")
+    configs = folders["SIMULATION_CONFIG_FOLDER"]
+    discharge_folder = root / "discharge"
+
+    template = _start_friction(json.loads((configs / "model.json").read_text()))
+    (configs / "model.json").write_text(json.dumps(template, indent=4))
+
+    own = configs / "OWN_Q001"
+    own.mkdir(exist_ok=True)
+    model = json.loads(json.dumps(template))
+    model["SETUP"]["simulation_name"] = "swashes_macdonald_own_config"
+    plane = model["SETUP"]["BASEHPC"]["BASEPLANE_2D"]
+    plane["GEOMETRY"]["mesh_file"] = str((folders["MESH_FOLDER"] / f"{CASE_NAME}.2dm").resolve())
+    functions_io.set_inflow_discharge(model, discharge_file=str((discharge_folder / f"{DISCHARGE_CODE}.txt").resolve()))
+    (own / "model.json").write_text(json.dumps(model, indent=4))
+    for name in ("simulation.json", "results.json"):
+        shutil.copyfile(configs / name, own / name)
+
+    ground_truth_root = folders["GROUND_TRUTH_FOLDER"]
+    flat = ground_truth_root / f"MACDONALD_{DISCHARGE_CODE}_1.csv"
+    for name in BATCH_CASES:
+        target = ground_truth_root / name
+        shutil.rmtree(target, ignore_errors=True)
+        target.mkdir()
+        shutil.copyfile(flat, target / f"{name}_1.csv")
+    flat.unlink()
+    return {**folders, "DISCHARGE": discharge_folder}
+
+
+def run_batch(basement_version: str = bmt.DEFAULT_BASEMENT_VERSION, gpu: bool = False) -> dict:
+    """
+    Benchmark of BOAR's batch mode on the subcritical MacDonald channel.
+
+    Runs the same two cases (template replication and own config) with several worker layouts and checks for
+    each: both summary rows ``ok``, best depth RMSE within ``DEPTH_RMSE_TOL``, the replicated template points to
+    the case's discharge file, and the same best vectors as the serial run (same seed).
+
+    Args:
+        basement_version: BASEMENT version to run.
+        gpu: Also run 1 GPU + 1 CPU worker (needs CUDA).
+
+    Returns:
+        dict: ``runs`` (label -> summary table and wall time) and ``passed``.
+    """
+    BATCH_FOLDER.mkdir(parents=True, exist_ok=True)
+    logging.basicConfig(
+        filename=BATCH_FOLDER / "benchmark.log",
+        filemode="w",
+        level=logging.INFO,
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        force=True,
+    )
+    folders = write_batch_case(BATCH_FOLDER / "inputs")
+    loss = DepthLoss(triangle_areas(folders["MESH_FOLDER"] / f"{CASE_NAME}.2dm"))
+
+    layouts = {"serial (1 CPU)": (1, 0), "parallel (2 CPU)": (2, 0)}
+    if gpu:
+        layouts["parallel (1 GPU + 1 CPU)"] = (1, 1)
+
+    runs: dict = {}
+    passed = True
+    for label, (n_cpu, n_gpu) in layouts.items():
+        print(f"\n== SWASHES MacDonald batch benchmark: {label} ==", flush=True)
+        output = BATCH_FOLDER / "runs" / label.split(" ")[0] / f"{n_cpu}cpu_{n_gpu}gpu"
+        shutil.rmtree(output, ignore_errors=True)
+        run_folders = {**{k: v for k, v in folders.items() if k != "DISCHARGE"}, "OUTPUT_FOLDER": output}
+
+        user_opt = benchmark_options(basement_version, inputs=BATCH_FOLDER / "inputs", case="subcritical")
+        user_opt["surrogate_model_options"].update(BATCH_SURROGATE)
+        user_opt["batch_options"] = {"n_cpu_workers": n_cpu, "n_gpu_workers": n_gpu, "cpu_cores": -1}
+
+        cases = functions_io.discover_cases(
+            run_folders["SIMULATION_CONFIG_FOLDER"], run_folders["GROUND_TRUTH_FOLDER"], logging.getLogger("benchmark")
+        )
+        start = time.perf_counter()
+        batch.run(cases, user_opt, run_folders, loss_function=loss)
+        wall = time.perf_counter() - start
+
+        summary = pd.read_csv(output / batch.SUMMARY_FILE_NAME)
+        runs[label] = {"summary": summary, "wall": wall}
+        print(summary.to_string(index=False))
+        print(f"  Wall time: {wall:.0f} s")
+
+        checks = {
+            "all cases ok": len(summary) == len(BATCH_CASES) and (summary["status"] == "ok").all(),
+            f"best depth RMSE <= {DEPTH_RMSE_TOL} m": bool((summary["best_error"] <= DEPTH_RMSE_TOL).all()),
+        }
+        replicated = json.loads(next((output / "TEMPLATE_Q001").glob("*/model.json")).read_text())
+        inflow = [
+            bc
+            for bc in replicated["SETUP"]["BASEHPC"]["BASEPLANE_2D"]["HYDRAULICS"]["BOUNDARY"]["STANDARD"]
+            if bc["type"] in functions_io.INFLOW_BOUNDARY_TYPES
+        ]
+        checks["template replicated with Q001.txt"] = bool(inflow) and all(
+            Path(bc.get("discharge_file", "")).name == f"{DISCHARGE_CODE}.txt" for bc in inflow
+        )
+        if label != "serial (1 CPU)" and "serial (1 CPU)" in runs and n_gpu == 0:
+            reference = runs["serial (1 CPU)"]["summary"]
+            columns = [col for col in summary.columns if col.startswith("friction_")] + ["best_error", "n_iter_best"]
+            checks["same results as serial"] = bool(
+                np.allclose(summary[columns].to_numpy(float), reference[columns].to_numpy(float), rtol=1e-6)
+            )
+        for name, ok in checks.items():
+            print(f"  {'PASS' if ok else 'FAIL'}: {name}")
+        passed &= all(checks.values())
+
+    if "parallel (2 CPU)" in runs:
+        speedup = runs["serial (1 CPU)"]["wall"] / runs["parallel (2 CPU)"]["wall"]
+        print(f"\nParallel speed-up with 2 CPU workers: {speedup:.2f}x")
+    print(f"Batch benchmark {'PASSED' if passed else 'FAILED'}; outputs and log in {BATCH_FOLDER}")
+    return {"runs": runs, "passed": passed}
+
+
+# ── Interrupt and restart ────────────────────────────────────────────────────────────────────────────
+RESTART_FOLDER = BATCH_FOLDER / "restart"
+
+
+def _batch_options(basement_version: str, n_cpu: int, overwrite: bool) -> dict:
+    """Quick batch options of the subcritical benchmark."""
+    user_opt = benchmark_options(basement_version, inputs=BATCH_FOLDER / "inputs", case="subcritical")
+    user_opt["general_options"]["overwrite"] = overwrite
+    user_opt["surrogate_model_options"].update(BATCH_SURROGATE)
+    user_opt["batch_options"] = {"n_cpu_workers": n_cpu, "n_gpu_workers": 0, "cpu_cores": -1}
+    return user_opt
+
+
+def _run_batch_once(output: Path, basement_version: str, n_cpu: int, overwrite: bool) -> None:
+    """One batch run of the benchmark cases into ``output`` (the inputs must exist)."""
+    folders = {k: v for k, v in write_batch_case_folders(BATCH_FOLDER / "inputs").items()}
+    folders["OUTPUT_FOLDER"] = output
+    loss = DepthLoss(triangle_areas(folders["MESH_FOLDER"] / f"{CASE_NAME}.2dm"))
+    cases = functions_io.discover_cases(
+        folders["SIMULATION_CONFIG_FOLDER"], folders["GROUND_TRUTH_FOLDER"], logging.getLogger("benchmark")
+    )
+    batch.run(cases, _batch_options(basement_version, n_cpu, overwrite), folders, loss_function=loss)
+
+
+def write_batch_case_folders(root: Path) -> dict[str, Path]:
+    """The project folders of an existing batch benchmark layout (see :func:`write_batch_case`)."""
+    return {
+        "SIMULATION_CONFIG_FOLDER": root / "simulation_configs",
+        "MESH_FOLDER": root / "meshes",
+        "GROUND_TRUTH_FOLDER": root / "ground_truth",
+        "SUPPORT_DATA_FOLDER": root / "support_files",
+    }
+
+
+def _memory(output: Path) -> dict[str, pd.DataFrame]:
+    """optimization_memory.csv of every case under ``output`` (raises if one cannot be read)."""
+    memories = {}
+    for path in sorted(output.glob("*/*/optimization_memory.csv")):
+        memories[path.parent.parent.name] = pd.read_csv(path)
+    return memories
+
+
+def _basement_processes() -> list:
+    """Running BASEMENT programs (BMv4_*)."""
+    import psutil
+
+    found = []
+    for process in psutil.process_iter(["name"]):
+        if (process.info.get("name") or "").startswith("BMv4_"):
+            found.append(process)
+    return found
+
+
+def _batch_child(output: str, basement_version: str, n_cpu: int) -> None:
+    """Child process of the restart check: a batch run that a console break interrupts like Ctrl+C."""
+    import signal
+
+    if sys.platform == "win32":
+
+        def interrupt(signum, frame):
+            raise KeyboardInterrupt
+
+        signal.signal(signal.SIGBREAK, interrupt)
+    logging.basicConfig(filename=Path(output) / "interrupted.log", level=logging.INFO, force=True)
+    _run_batch_once(Path(output), basement_version, n_cpu, overwrite=True)
+
+
+def run_restart_check(basement_version: str = bmt.DEFAULT_BASEMENT_VERSION, n_cpu: int = 1) -> dict:
+    """
+    Interrupt a batch run like Ctrl+C and restart it with overwrite False.
+
+    1. Reference: the two benchmark cases, uninterrupted.
+    2. Interrupted: the same run in a child process, interrupted (console break, handled as Ctrl+C) when the
+       first case has finished and the second is in the optimization (serial), or when both are in the
+       optimization (parallel).
+    3. Checks: the child stops, no BASEMENT program keeps running, the memory files can be read.
+    4. Restart with overwrite False: finished cases are skipped, interrupted ones continue their budget; every
+       case must end with the same evaluations and best vector as the reference.
+
+    Args:
+        basement_version: BASEMENT version to run.
+        n_cpu: CPU workers (1: serial, 2: parallel).
+
+    Returns:
+        dict: ``checks`` (name -> passed) and ``passed``.
+    """
+    import signal
+    import subprocess
+
+    label = "serial" if n_cpu == 1 else f"parallel ({n_cpu} CPU)"
+    print(f"\n== Interrupt and restart check: {label} ==", flush=True)
+    RESTART_FOLDER.mkdir(parents=True, exist_ok=True)
+    logging.basicConfig(filename=RESTART_FOLDER / "restart_check.log", filemode="w", level=logging.INFO, force=True)
+    write_batch_case(BATCH_FOLDER / "inputs")
+    n_initial = BATCH_SURROGATE["n_initial"]
+    names = sorted(BATCH_CASES)
+
+    reference = RESTART_FOLDER / f"{n_cpu}cpu" / "reference"
+    shutil.rmtree(reference, ignore_errors=True)
+    print("1. Reference run (uninterrupted)", flush=True)
+    _run_batch_once(reference, basement_version, n_cpu, overwrite=True)
+    expected = _memory(reference)
+
+    interrupted = RESTART_FOLDER / f"{n_cpu}cpu" / "interrupted"
+    shutil.rmtree(interrupted, ignore_errors=True)
+    interrupted.mkdir(parents=True)
+    print("2. Interrupted run", flush=True)
+    flags = (
+        {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP}
+        if sys.platform == "win32"
+        else {"start_new_session": True}
+    )
+    child = subprocess.Popen(
+        [
+            sys.executable,
+            str(Path(__file__).resolve()),
+            "--batch-child",
+            str(interrupted),
+            basement_version,
+            str(n_cpu),
+        ],
+        cwd=ROOT,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        **flags,
+    )
+
+    def ready() -> bool:
+        rows = {name: len(memory) for name, memory in _memory(interrupted).items()}
+        finished = [n for n in names if list(interrupted.glob(f"{n}/*/{batch.FINISHED_FILE_NAME}"))]
+        if n_cpu == 1:  # first case done, second some iterations into the optimization
+            return len(finished) == 1 and rows.get(names[1], 0) >= n_initial + 2
+        return not finished and all(rows.get(n, 0) >= n_initial + 2 for n in names)
+
+    start = time.perf_counter()
+    while not ready():
+        if child.poll() is not None:
+            raise RuntimeError("The batch run ended before the interruption point.")
+        if time.perf_counter() - start > 900:
+            child.kill()
+            raise RuntimeError("The interruption point was not reached within 15 minutes.")
+        time.sleep(0.2)
+    at_interrupt = {name: len(memory) for name, memory in _memory(interrupted).items()}
+    finished_before = [n for n in names if list(interrupted.glob(f"{n}/*/{batch.FINISHED_FILE_NAME}"))]
+    print(f"   Interrupting with evaluations {at_interrupt}, finished {finished_before or 'none'}", flush=True)
+    if sys.platform == "win32":
+        child.send_signal(signal.CTRL_BREAK_EVENT)
+    else:
+        os.killpg(child.pid, signal.SIGINT)
+
+    checks: dict[str, bool] = {}
+    try:
+        child.wait(timeout=60)
+        checks["run stops within 60 s"] = True
+    except subprocess.TimeoutExpired:
+        child.kill()
+        checks["run stops within 60 s"] = False
+    time.sleep(2)
+    left = _basement_processes()
+    checks["no BASEMENT process left running"] = not left
+    for process in left:
+        process.kill()
+    try:
+        memories = _memory(interrupted)
+        checks["memory files readable"] = all(memory["Calibration Error"].notna().all() for memory in memories.values())
+    except Exception:
+        checks["memory files readable"] = False
+    after = {name: len(memory) for name, memory in _memory(interrupted).items()}
+    print(f"   Stopped (exit code {child.returncode}); evaluations kept {after}", flush=True)
+
+    print("3. Restart with overwrite: False", flush=True)
+    _run_batch_once(interrupted, basement_version, n_cpu, overwrite=False)
+    final = _memory(interrupted)
+    for name in finished_before:
+        checks[f"{name} finished earlier: not run again"] = len(final[name]) == after[name]
+    for name in names:
+        same_count = len(final[name]) == len(expected[name])
+        best = final[name].loc[final[name]["Calibration Error"].idxmin()]
+        best_ref = expected[name].loc[expected[name]["Calibration Error"].idxmin()]
+        checks[f"{name}: {len(final[name])} evaluations (reference {len(expected[name])})"] = same_count
+        checks[f"{name}: same best vector as the reference"] = best["Friction Vector"] == best_ref["Friction Vector"]
+    summary = pd.read_csv(interrupted / batch.SUMMARY_FILE_NAME)
+    checks["summary complete after restart"] = sorted(summary["status"]) == ["ok"] * len(names)
+
+    for name, ok in checks.items():
+        print(f"  {'PASS' if ok else 'FAIL'}: {name}")
+    passed = all(checks.values())
+    print(f"Interrupt and restart check {'PASSED' if passed else 'FAILED'}; outputs in {RESTART_FOLDER}")
+    return {"checks": checks, "passed": passed}
+
+
 def main(argv: list[str] | None = None) -> None:
     """Run the benchmark; skip with a message where BASEMENT is not installed."""
     parser = argparse.ArgumentParser(description="SWASHES MacDonald channel benchmarks for BOAR + BASEMENT.")
@@ -1148,11 +1485,40 @@ def main(argv: list[str] | None = None) -> None:
         "each variant has its own output folder.",
     )
     parser.add_argument("--basement-version", default=bmt.DEFAULT_BASEMENT_VERSION, help='"4.2" or "4.3"')
+    parser.add_argument(
+        "--batch",
+        action="store_true",
+        help="Batch-mode benchmark: two subcritical cases (shared template and own config), calibrated serially, "
+        "with 2 CPU workers and, with --gpu, with 1 GPU + 1 CPU worker.",
+    )
+    parser.add_argument("--gpu", action="store_true", help="--batch: also run with 1 GPU + 1 CPU worker (CUDA).")
+    parser.add_argument(
+        "--batch-restart",
+        action="store_true",
+        help="Interrupt a batch run like Ctrl+C (serial, then 2 CPU workers) and check that a restart with "
+        "overwrite False skips finished cases and continues the others to the uninterrupted result.",
+    )
+    parser.add_argument("--batch-child", nargs=3, metavar=("OUTPUT", "VERSION", "N_CPU"), help=argparse.SUPPRESS)
     args = parser.parse_args([] if argv is None else argv)
 
     exe = basement_executable(args.basement_version)
     if not exe.exists():
         print(f"BASEMENT benchmark skipped: {exe} not found (set BASEMENT_PATH in user_defined_configs/constants.py).")
+        return
+
+    if args.batch_child:
+        _batch_child(args.batch_child[0], args.batch_child[1], int(args.batch_child[2]))
+        return
+
+    if args.batch_restart:
+        results = [run_restart_check(args.basement_version, n_cpu) for n_cpu in (1, 2)]
+        if not all(r["passed"] for r in results):
+            raise SystemExit(1)
+        return
+
+    if args.batch:
+        if not run_batch(args.basement_version, gpu=args.gpu)["passed"]:
+            raise SystemExit(1)
         return
 
     result = run(

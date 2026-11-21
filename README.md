@@ -133,6 +133,13 @@ If you use BOAR in your research, please cite:
 
 On GitHub, click **Cite this repository** in the right-hand sidebar to copy this reference in APA or BibTeX format (generated from [CITATION.cff](CITATION.cff)).
 
+## Acknowledgements
+
+The placement of parallel batch runs on CPU sockets and GPUs (`src/cpu_topology.py`) and parts of the batch
+queue (`src/batch.py`) come from [capiQ](https://github.com/KIT-IWU-HydroEng/capiQ) (Oliveira, L., capiQ:
+Computational Automation Pipeline for Hydro-morphodynamic simulation Queues, version 0.1.0, Karlsruhe Institute
+of Technology), under the MIT License. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
 ## Contributing
 
 Contributions are welcome — see [`CONTRIBUTING.md`](CONTRIBUTING.md) for the full guide (Gitflow, coding standards, tests). Suggested contributions include:

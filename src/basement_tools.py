@@ -29,7 +29,7 @@ import h5py
 import numpy as np
 
 # Import Basement-Calibrator modules
-from src import functions_io, utils
+from src import cpu_topology, functions_io, utils
 from user_defined_configs import constants as c
 
 # BASEMENT version assumed when ``basement_options`` has no ``basement_version``.
@@ -93,6 +93,9 @@ class SimulationManager:
         self.silent = silent
         self.log_dev = log_dev
         self.run_parameters = run_parameters
+        # Set by BOAR's batch mode: CPU socket, cores and GPU card of the case (cpu_topology.Placement); None
+        # runs BASEMENT unpinned
+        self.placement: cpu_topology.Placement | None = run_parameters.get("_placement")
         self.basement_version = self._parse_basement_version(
             run_parameters.get("basement_version", DEFAULT_BASEMENT_VERSION)
         )
@@ -112,6 +115,12 @@ class SimulationManager:
             f"BASEMENT {'.'.join(map(str, self.basement_version))} programs from: {self.basement_path}",
             silent=self.silent,
         )
+
+    def _launch(self, cmd: list[str]) -> tuple[list[str] | str, dict[str, str] | None]:
+        """Command and environment of a BASEMENT program: pinned to the case's socket and cores, on its GPU."""
+        if self.placement is not None and self.placement.pinned:
+            return cpu_topology.pinned_command(cmd, self.placement), cpu_topology.launch_env(self.placement)
+        return cmd, cpu_topology.launch_env(self.placement)
 
     @staticmethod
     def _parse_basement_version(version: Any) -> tuple[int, int]:
@@ -289,7 +298,8 @@ class SimulationManager:
             utils.write_log(self.logger, f"Setup command: {results_command}", level="debug", silent=not self.log_dev)
 
             utils.write_log(self.logger, "Starting setup...", silent=not self.log_dev)
-            proc_results = subprocess.run(results_command, shell=False, capture_output=True, text=True)  # nosec B603 – args are validated file paths from os.path.join/config
+            command, env = self._launch(results_command)
+            proc_results = subprocess.run(command, shell=False, capture_output=True, text=True, env=env)  # nosec B603 – args are validated file paths from os.path.join/config
 
             if proc_results.stdout:
                 utils.write_log(self.logger, proc_results.stdout.strip(), level="info", silent=not self.log_dev)
@@ -366,7 +376,10 @@ class SimulationManager:
         # Run the simulation process
         try:
             utils.write_log(self.logger, "Starting simulation...", silent=not self.log_dev)
-            with subprocess.Popen(sim_command, shell=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE) as proc:  # nosec B603 – args are validated file paths from os.path.join/config
+            command, env = self._launch(sim_command)
+            with subprocess.Popen(
+                command, shell=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env
+            ) as proc:  # nosec B603 – args are validated file paths from os.path.join/config
                 stdout, stderr = proc.communicate()
 
                 if stdout:
@@ -428,7 +441,8 @@ class SimulationManager:
             utils.write_log(self.logger, f"Results command: {results_command}", level="debug", silent=not self.log_dev)
 
             utils.write_log(self.logger, "Starting results processing...", silent=not self.log_dev)
-            proc_results = subprocess.run(results_command, shell=False, capture_output=True, text=True)  # nosec B603 – args are validated file paths from os.path.join/config
+            command, env = self._launch(results_command)
+            proc_results = subprocess.run(command, shell=False, capture_output=True, text=True, env=env)  # nosec B603 – args are validated file paths from os.path.join/config
 
             if proc_results.stdout:
                 utils.write_log(self.logger, proc_results.stdout.strip(), level="info", silent=not self.log_dev)
@@ -793,26 +807,10 @@ class SimulationManager:
         model_config = self._load_model_config()
         model_config_path = os.path.join(self.sim_folder, "model.json")
 
-        boundaries = model_config["SETUP"]["BASEHPC"]["BASEPLANE_2D"]["HYDRAULICS"]["BOUNDARY"]["STANDARD"]
-
-        possible_bcs = ["froude_in", "uniform_in"]
-
-        for ii, bc_dict in enumerate(boundaries):
-            # Check boundary type
-            if bc_dict["type"] in possible_bcs:
-                if file:
-                    bc_dict["discharge_file"] = new_discharge
-                    try:
-                        del bc_dict["discharge"]
-                    except KeyError:
-                        pass
-
-                else:
-                    bc_dict["discharge"] = new_discharge
-                    try:
-                        del bc_dict["discharge_file"]
-                    except KeyError:
-                        pass
+        if file:
+            functions_io.set_inflow_discharge(model_config, discharge_file=new_discharge)
+        else:
+            functions_io.set_inflow_discharge(model_config, discharge=new_discharge)
 
         try:
             with open(model_config_path, "w") as f:

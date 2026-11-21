@@ -17,11 +17,13 @@ dependencies = [
     "openpyxl>=3.1.5",
     "optuna>=4.0.0",
     "pandas>=2.2.0",
+    "psutil>=5.9",
     "PyYAML>=6.0.1",
     "scikit_learn>=1.6.0",
     "scikit_optimize>=0.10.2",
     "scipy>=1.15.0",
     "torch>=2.4.0",
+    "tqdm>=4.66",
 ]
 
 # Development tools (lint, type check, security, tests, docs).

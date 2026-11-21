@@ -7,9 +7,9 @@ Main entry point for BOAR (Bayesian Optimization for Automated Roughness calibra
 This module orchestrates the calibration workflow by:
     - Loading user configuration from YAML files
     - Setting up logging for execution tracking
-    - Importing simulation and observation data
-    - Calculating mesh cell centroids
-    - Running the friction calibration process
+    - Finding the cases to calibrate: one (flat ground_truth/) or several (ground_truth/SCENARIO_DISCHARGE/)
+    - For each case: importing the data, calculating mesh cell centroids and running the friction calibration
+    - Writing the best friction vector of every case to output/calibration_summary.csv
 
 Example:
     Run the calibration with default settings:
@@ -35,7 +35,7 @@ import yaml
 module_path = Path(__file__).parent
 sys.path.insert(0, str(module_path))
 
-from src import basement_tools, cell_centroid, friction_calibration, functions_io
+from src import basement_tools, batch, functions_io
 
 
 def setup_logger(filename) -> logging.Logger:
@@ -76,11 +76,11 @@ def main(logger_filename: str = "boar.log") -> None:
 
         1. Loads user-defined options from a YAML configuration file.
         2. Sets up a logger to track the execution of the script.
-        3. Creates necessary directories for input and output data.
-        4. Logs the user options for reference.
-        5. Imports simulation and observation data from CSV files.
-        6. Calculates cell centroids from simulation data.
-        7. Optimizes the friction region using Bayesian optimization.
+        3. Logs the user options for reference.
+        4. Finds the cases to calibrate (single mode or batch mode, see src/batch.py).
+        5. For each case: prepares its run folder, imports the data, calculates cell centroids and
+           optimizes the friction regions using Bayesian optimization.
+        6. Writes the best vector of every case to output/calibration_summary.csv.
 
     Args:
         logger_filename (str): Name of the log file. Default is 'boar.log'.
@@ -97,21 +97,18 @@ def main(logger_filename: str = "boar.log") -> None:
     logger.info(f"{__version__} | BASEMENT v.{basement_version}")
     logger.info("Starting main function")
 
-    dict_paths = functions_io.setup_directories(module_path, user_opt, logger)
-
     # Log user options
     logger.info("User arguments:")
     for key, value in user_opt.items():
         logger.info(f"\t{key}: {value}")
 
-    # Import CSV
-    data = functions_io.main(dict_paths)
+    # Find the cases: single mode (flat ground_truth/) or batch mode (one subfolder per scenario/discharge)
+    folders = functions_io.default_folders()
+    folders["PROJECT_ROOT"] = module_path
+    cases = functions_io.discover_cases(folders["SIMULATION_CONFIG_FOLDER"], folders["GROUND_TRUTH_FOLDER"], logger)
 
-    # Calculate cell centroids
-    data = cell_centroid.main(data, dict_paths, user_opt)
-
-    # Optimize the friction region
-    friction_calibration.main(data, dict_paths, user_opt)
+    # Calibrate them (serially or in parallel, see batch_options) and write the summary CSV
+    batch.run(cases, user_opt, folders)
 
     logger.info("Main function finished")
 

@@ -20,6 +20,19 @@ basement_options:
   'basement_version': "4.3" # [str] BASEMENT version to run and read: "4.2" or "4.3". On Windows it also selects the install folder (C:\Program Files\BASEMENT <version>.0\bin) unless BASEMENT_PATH is set in constants.py. (Default: "4.3")
 
 # -----------------------------------------------------------------------------
+# Batch Options (batch mode only: ground_truth/ holds one subfolder SCENARIO_DISCHARGE per case)
+# Single mode (flat ground_truth/) ignores this block and uses basement_options.
+# -----------------------------------------------------------------------------
+batch_options:
+  'n_cpu_workers': 1      # [int] Cases calibrated at the same time on the CPU, with basement_options' backend (omp/seq). (Default: 1)
+  'cpu_cores': -1         # [int] Physical cores (one BASEMENT thread each) of EACH CPU run; hyperthreads are not counted. -1 = the physical cores of the machine (of each socket when pinned) shared evenly between the CPU workers. (Default: -1)
+  'n_gpu_workers': 0      # [int] Cases calibrated at the same time on GPUs, spread over the cards found by nvidia-smi. (Default: 0)
+  'gpu_backend': cudaC    # [str] Backend of the GPU workers: cuda or cudaC. (Default: cudaC)
+  'preferred_device': gpu # [str] Worker that takes the next case when a GPU and a CPU worker are both free: gpu or cpu. (Default: gpu)
+  'pin_to_socket': True   # [bool] Several CPU sockets: keep each CPU run inside one socket on its own cores, and give each GPU run a core on its card's socket. No effect with one socket. Not tested on multi-socket Linux. (Default: True)
+  # 'gpu_numa_nodes': [0, 1]  # [list[int]] Socket of each GPU (nvidia-smi order), only if auto-detection fails.
+
+# -----------------------------------------------------------------------------
 # Simulation Options
 # -----------------------------------------------------------------------------
 simulation_options:

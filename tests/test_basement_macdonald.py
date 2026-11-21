@@ -352,3 +352,23 @@ def test_benchmark_end_to_end(case, turbulence):
     result = bm.run(case, calibrate=True, basement_version=bmt.DEFAULT_BASEMENT_VERSION, turbulence=turbulence)
     assert result["passed"]
     assert result["boar_calibrated"]["rmse"] <= bm.DEPTH_RMSE_TOL
+
+
+def test_batch_layout(tmp_path):
+    """The batch benchmark layout: shared template + own config folder, one ground-truth folder per case."""
+    folders = bm.write_batch_case(tmp_path)
+    cases = fio.discover_cases(folders["SIMULATION_CONFIG_FOLDER"], folders["GROUND_TRUTH_FOLDER"], LOGGER)
+    assert {c.name: c.shared_config for c in cases} == {"OWN_Q001": False, "TEMPLATE_Q001": True}
+    assert all(c.error is None for c in cases)
+    template = json.loads((folders["SIMULATION_CONFIG_FOLDER"] / "model.json").read_text())
+    regions = template["SETUP"]["BASEHPC"]["BASEPLANE_2D"]["HYDRAULICS"]["FRICTION"]["regions"]
+    assert {r["friction"] for r in regions} == {bm.CALIBRATION_START_N}
+
+
+@pytest.mark.slow
+@pytest.mark.requires_basement
+def test_batch_benchmark_end_to_end():
+    """Batch mode on the subcritical channel: serial and 2 CPU workers give the same, accurate calibrations."""
+    if not bm.basement_executable().exists():
+        pytest.skip(f"BASEMENT not installed: {bm.basement_executable()}")
+    assert bm.run_batch(bmt.DEFAULT_BASEMENT_VERSION)["passed"]

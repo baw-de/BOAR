@@ -22,7 +22,10 @@ MESH_FOLDER : pathlib.Path
 SUPPORT_DATA_FOLDER : pathlib.Path
     Directory containing supplementary support data files.
 GROUND_TRUTH_FOLDER : pathlib.Path
-    Directory containing reference/validation ground-truth data.
+    Directory containing reference/validation ground-truth data. CSV files directly in it: one calibration
+    (single mode). Subfolders ``SCENARIO_DISCHARGE/``: one calibration each (batch mode), configured by
+    ``SIMULATION_CONFIG_FOLDER / SCENARIO_DISCHARGE`` or, without that folder, by the flat template in
+    ``SIMULATION_CONFIG_FOLDER``; the results go to ``OUTPUT_FOLDER / SCENARIO_DISCHARGE / <simulation_name>``.
 """
 # Imports
 import pathlib

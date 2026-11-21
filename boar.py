@@ -35,7 +35,7 @@ import yaml
 module_path = Path(__file__).parent
 sys.path.insert(0, str(module_path))
 
-from src import cell_centroid, friction_calibration, functions_io
+from src import basement_tools, cell_centroid, friction_calibration, functions_io
 
 
 def setup_logger(filename) -> logging.Logger:
@@ -91,6 +91,10 @@ def main(logger_filename: str = "boar.log") -> None:
 
     # Setup logger
     logger = setup_logger(logger_filename)
+    basement_version = user_opt.get("basement_options", {}).get(
+        "basement_version", basement_tools.DEFAULT_BASEMENT_VERSION
+    )
+    logger.info(f"{__version__} | BASEMENT v.{basement_version}")
     logger.info("Starting main function")
 
     dict_paths = functions_io.setup_directories(module_path, user_opt, logger)

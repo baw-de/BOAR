@@ -1,0 +1,50 @@
+cff-version: 1.2.0
+message: "If you use BOAR in your research, please cite the SoftwareX article below."
+title: "BOAR: Bayesian optimization for automated roughness calibration in two-dimensional hydrodynamic models"
+type: software
+version: 1.0.0
+license: GPL-3.0-only
+repository-code: "https://github.com/baw-de/BOAR"
+url: "https://doi.org/10.1016/j.softx.2026.102899"
+abstract: >-
+  BOAR is an open-source Python framework for automated hydraulic roughness
+  calibration in two-dimensional shallow-water numerical solvers. BOAR combines
+  Bayesian optimization with conditional sampling to integrate expert knowledge,
+  including feasible parameter ranges and inter-parameter constraints, thereby
+  reducing the number of model evaluations.
+keywords:
+  - Bayesian optimization
+  - Hydraulic roughness calibration
+  - Shallow water solvers
+  - BASEMENT
+  - Surrogate model
+  - Gaussian process
+  - Model calibration
+authors:
+  - family-names: "de Oliveira"
+    given-names: "Luiz E.D."
+  - family-names: "Franca"
+    given-names: "Mário J."
+  - family-names: "Huber"
+    given-names: "Nils P."
+  - family-names: "Vanzo"
+    given-names: "Davide"
+preferred-citation:
+  type: article
+  title: "BOAR: Bayesian optimization for automated roughness calibration in two-dimensional hydrodynamic models"
+  authors:
+    - family-names: "de Oliveira"
+      given-names: "Luiz E.D."
+    - family-names: "Franca"
+      given-names: "Mário J."
+    - family-names: "Huber"
+      given-names: "Nils P."
+    - family-names: "Vanzo"
+      given-names: "Davide"
+  journal: "SoftwareX"
+  volume: 35
+  articleno: "102899"
+  year: 2026
+  issn: "2352-7110"
+  doi: "10.1016/j.softx.2026.102899"
+  url: "https://www.sciencedirect.com/science/article/pii/S2352711026003900"

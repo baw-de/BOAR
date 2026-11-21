@@ -41,7 +41,7 @@ from src.functions_io import Case
 
 logger = logging.getLogger("batch")
 
-GPU_BACKENDS = ("cuda", "cudaC")
+GPU_BACKENDS = ("cuda", "cudaC", "cudaO")  # BASEMENT's CUDA solvers (BMv4_BASEHPC_<backend>)
 SUMMARY_FILE_NAME = "calibration_summary.csv"
 # Written into a case's run folder when its calibration has finished; with overwrite False the case is skipped
 FINISHED_FILE_NAME = "calibration_finished.json"
@@ -387,18 +387,21 @@ def finished_row(case: Case, folders: dict) -> dict | None:
         return None
 
 
-def _preflight(cases: list[Case], user_opt: dict, folders: dict) -> tuple[list[tuple[Case, dict]], dict]:
+def _preflight(cases: list[Case], user_opt: dict, folders: dict) -> tuple[list[tuple[Case, dict | None]], dict]:
     """Check every batch case before the queue starts: the inflow discharge must resolve."""
     simulation_options = user_opt.get("simulation_options", {})
-    table = functions_io.read_discharge_table(folders["SUPPORT_DATA_FOLDER"])
-    ready: list[tuple[Case, dict]] = []
+    discharge_folder = functions_io.discharge_files_folder(simulation_options, folders, logger)
+    table = functions_io.read_discharge_table(discharge_folder)
+    ready: list[tuple[Case, dict | None]] = []
     failed: dict = {}
     for case in cases:
         if case.error:
             failed[case.name] = case.error
             continue
         try:
-            inflow = functions_io.resolve_inflow(str(case.discharge), simulation_options, table)
+            # Time series or constant, as the inflow boundary of the model.json of the case gives it
+            kind = functions_io.read_inflow_discharge_kind(case.config_folder)
+            inflow = functions_io.resolve_inflow(str(case.discharge), kind, table, discharge_folder)
         except (FileNotFoundError, KeyError) as exc:
             failed[case.name] = str(exc).strip("'\"")
             continue
@@ -432,7 +435,12 @@ def _notice(cases, ready, failed, done, workers: Workers, folders, summary_path)
             lines.append(f"    {case.name:<{width}}  finished earlier, skipped")
             continue
         inflow = next(i for c, i in ready if c is case)
-        discharge = Path(inflow["discharge_file"]).name if "discharge_file" in inflow else f"{inflow['discharge']} m3/s"
+        if inflow is None:
+            discharge = "as in model.json (no uniform_in/froude_in inflow)"
+        elif "discharge_file" in inflow:
+            discharge = Path(inflow["discharge_file"]).name
+        else:
+            discharge = f"{inflow['discharge']} m3/s"
         source = "template  " if case.shared_config else f"own config ({config_root.name}/{case.name}/)"
         lines.append(f"    {case.name:<{width}}  {source} -> discharge {discharge}")
     lines.append(f"  Summary: {summary_path}")

@@ -26,7 +26,6 @@ The ``basement_options`` section controls BASEMENT simulation settings.
 .. code-block:: yaml
 
    basement_options:
-     'cleanup': False          # [bool] Remove previous results before running
      'backend': omp            # [str] Backend: seq, omp, cuda, cudaC, cudaO
      'nthreads': -1            # [int] Number of cores (-1 = all available)
      'basement_version': "4.3" # [str] BASEMENT version: "4.2" or "4.3" (Default: "4.3")
@@ -69,17 +68,20 @@ Backend Options
 | cudaO    | CUDA execution with OpenMP CPU processor         |
 +----------+--------------------------------------------------+
 
-Simulation Options
-------------------
+Discharge
+---------
 
-Configure discharge files and simulation inputs.
+The discharge needs no option. BOAR takes the discharge code from the ground-truth file names
+(``CASE_Q001_1.csv`` -> ``Q001``) and the kind of discharge from the inflow boundary (``uniform_in`` or
+``froude_in``) of ``model.json``:
 
-.. code-block:: yaml
+- ``discharge_file``: the time series ``discharge_files/<CODE>.txt``
+  (``DISCHARGE_FILES_FOLDER`` in ``constants.py``);
+- ``discharge``: the constant value of ``<CODE>`` in ``discharge_files/discharge_dictionary.csv`` (needed only in this case).
 
-   simulation_options:
-     'discharge_file': True                                # [bool] Define the model setup discharge using a TXT file. (Default: False)
-     'discharge_file_directory': /path/to/discharge_files  # [str] Directory containing discharge files. Only required if 'discharge_file' is True.
-     'discharge_file_list': ['Q001.txt', 'Q002.txt']       # [list] List of discharge files to use. Only required if 'discharge_file' is True.
+Earlier versions set this with ``simulation_options`` (``discharge_file``, ``discharge_file_directory``,
+``discharge_file_list``). Those options are no longer needed: ``discharge_file_directory`` still replaces the
+folder above, with a warning, and the other two are ignored.
 
 Optimization Variable Options
 -----------------------------

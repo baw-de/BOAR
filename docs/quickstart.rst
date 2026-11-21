@@ -45,11 +45,10 @@ data. The typical running instance has the following directory structure:
        │   ├── constants.py
        │   ├── function_loss.py
        │   └── user_options.yaml
-       ├── support_files/
-       │   ├── discharge_files/
-       │   │   ├── Q001.txt
-       │   │   └── Q002.txt
-       │   └── discharge_dictionary.csv    # Maps discharge files to simulation configurations
+       ├── discharge_files/                 # Discharges of the ground-truth codes (see Discharge below)
+       │   ├── Q001.txt                     # Time series, for an inflow with discharge_file
+       │   ├── Q002.txt
+       │   └── discharge_dictionary.csv     # Code and value, only for an inflow with a constant discharge
        ├── ground_truth/
        │   ├── CASE_Q001_*.csv              # Ground truth data for CASE at discharge Q001
        │   ├── CASE_Q001_1.csv              # Ground truth data for CASE at discharge Q001 for point collection 1
@@ -125,9 +124,10 @@ The files inside keep the usual naming, ``S1_Q001_*.csv``.
 
 For each case BOAR uses ``simulation_configs/SCENARIO_DISCHARGE/`` when that folder exists. Otherwise it
 replicates the flat template ``simulation_configs/model.json`` and replaces the discharge of its inflow
-boundaries (``uniform_in``, ``froude_in``) with the case's discharge: the file
-``<discharge_file_directory>/<DISCHARGE>.txt`` when ``simulation_options.discharge_file`` is ``True``, otherwise
-the value of the code in ``support_files/discharge_dictionary.csv``. The originals are never changed. Before the
+boundaries (``uniform_in``, ``froude_in``) with the case's discharge, of the same kind as in model.json (see
+`Discharge`_): the file ``discharge_files/<DISCHARGE>.txt`` when the boundary holds a
+``discharge_file``, the value of the code in ``discharge_files/discharge_dictionary.csv`` when it holds a constant
+``discharge``. The originals are never changed. Before the
 first case starts, BOAR prints which cases replicate the template, and with which discharge, followed by a
 progress bar:
 
@@ -155,7 +155,7 @@ same time, on CPU and GPU workers in any combination:
      'n_cpu_workers': 2        # cases at the same time on the CPU (backend of basement_options: omp/seq)
      'cpu_cores': -1           # physical cores of EACH CPU run; -1 = shared evenly
      'n_gpu_workers': 1        # cases at the same time on GPUs
-     'gpu_backend': cudaC      # cuda or cudaC
+     'gpu_backend': cudaC      # cuda, cudaC or cudaO
      'preferred_device': gpu   # takes the next case when a GPU and a CPU worker are both free
      'pin_to_socket': True     # several CPU sockets: one socket per CPU run, GPU runs on their card's socket
      # 'gpu_numa_nodes': [0, 1]  # socket of each GPU, only if auto-detection fails
@@ -209,16 +209,23 @@ Functionalities
 
 Discharge
 ^^^^^^^^^
-BOAR can calibrate either a single hydraulic roughness coefficient for an entire discharge range
-or individual coefficients for specific discharge values. This behaviour is controlled by the
-`simulation_options.discharge_file_list` option in the `user_options.yaml` file.
+The discharges come from the ground-truth file names: ``CASE_Q001_1.csv`` belongs to discharge ``Q001``.
 
-If `simulation_options.discharge_file_list` contains multiple discharge files, the code calibrates
-a single coefficient for the entire discharge range. If it contains only one discharge file, the code
-calibrates a single coefficient for that specific discharge value.
+- **Single mode:** if ``ground_truth/`` holds files of several codes (``CASE_Q001_*.csv``, ``CASE_Q002_*.csv``),
+  every evaluation runs all of them and adds up their errors, so one coefficient set is calibrated for the
+  whole discharge range. Files of one code calibrate for that discharge only.
+- **Batch mode:** each case (``ground_truth/S1_Q001/``) is calibrated for its own discharge.
 
-The number of discharge files specified in `simulation_options.discharge_file_list` must match the
-number of discharge files specified in the ground-truth file names.
+How BOAR sets a discharge follows the inflow boundary (``uniform_in`` or ``froude_in``) of ``model.json``:
+
+- it holds a ``discharge_file``: BOAR uses the time series ``discharge_files/<CODE>.txt``;
+- it holds a constant ``discharge``: BOAR uses the value of ``<CODE>`` in ``discharge_files/discharge_dictionary.csv``
+  (columns ``Code`` and the discharge value);
+- it has neither (for example a ``zqhydrograph`` inflow): the discharge of ``model.json`` is not changed.
+
+Every code in the ground-truth file names needs its ``<CODE>.txt`` (time series) or its row in
+``discharge_dictionary.csv`` (constant); BOAR checks this before the first simulation. The dictionary is not
+needed for time series. The folder is ``DISCHARGE_FILES_FOLDER`` in ``constants.py``.
 
 Friction regions
 ^^^^^^^^^^^^^^^^

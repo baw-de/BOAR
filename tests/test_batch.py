@@ -46,19 +46,16 @@ def project(tmp_path: Path) -> dict[str, Path]:
         "GROUND_TRUTH_FOLDER": tmp_path / "ground_truth",
         "OUTPUT_FOLDER": tmp_path / "output",
         "MESH_FOLDER": tmp_path / "meshes",
-        "SUPPORT_DATA_FOLDER": tmp_path / "support_files",
+        "DISCHARGE_FILES_FOLDER": tmp_path / "discharge_files",
     }
     for folder in folders.values():
-        folder.mkdir()
+        folder.mkdir(exist_ok=True)
     _write_configs(folders["SIMULATION_CONFIG_FOLDER"], "template_case")
-    discharge = tmp_path / "discharge"
-    discharge.mkdir()
     for code in ("Q001", "Q002"):
-        (discharge / f"{code}.txt").write_text("0 1\n")
+        (folders["DISCHARGE_FILES_FOLDER"] / f"{code}.txt").write_text("0 1\n")
     pd.DataFrame({"Code": ["Q001", "Q002"], "Q": [10.0, 20.0]}).to_csv(
-        folders["SUPPORT_DATA_FOLDER"] / "discharge_dictionary.csv", index=False
+        folders["DISCHARGE_FILES_FOLDER"] / "discharge_dictionary.csv", index=False
     )
-    folders["DISCHARGE"] = discharge
     return folders
 
 
@@ -110,15 +107,45 @@ def test_set_inflow_discharge_changes_only_inflow_boundaries():
         fio.set_inflow_discharge(model)
 
 
+def test_inflow_discharge_kind_from_model_json():
+    model = _model()  # uniform_in with a discharge_file
+    assert fio.inflow_discharge_kind(model) == "file"
+    fio.set_inflow_discharge(model, discharge=12.5)
+    assert fio.inflow_discharge_kind(model) == "value"
+    model["SETUP"]["BASEHPC"]["BASEPLANE_2D"]["HYDRAULICS"]["BOUNDARY"]["STANDARD"] = [
+        {"type": "zqhydrograph", "wse_file": "w.txt", "spec_discharge_file": "q.txt"}
+    ]
+    assert fio.inflow_discharge_kind(model) is None
+    assert fio.inflow_discharge_kind({}) is None
+
+
 def test_resolve_inflow_file_and_table(project):
-    table = fio.read_discharge_table(project["SUPPORT_DATA_FOLDER"])
-    by_file = {"discharge_file": True, "discharge_file_directory": str(project["DISCHARGE"])}
-    assert Path(fio.resolve_inflow("Q002", by_file, table)["discharge_file"]).name == "Q002.txt"
+    table = fio.read_discharge_table(project["DISCHARGE_FILES_FOLDER"])
+    folder = fio.discharge_files_folder({}, project)
+    assert folder == project["DISCHARGE_FILES_FOLDER"].resolve()
+    assert Path(fio.resolve_inflow("Q002", "file", table, folder)["discharge_file"]).name == "Q002.txt"
     with pytest.raises(FileNotFoundError):
-        fio.resolve_inflow("Q009", by_file, table)
-    assert fio.resolve_inflow("Q002", {"discharge_file": False}, table) == {"discharge": 20.0}
+        fio.resolve_inflow("Q009", "file", table, folder)
+    assert fio.resolve_inflow("Q002", "value", table, folder) == {"discharge": 20.0}
     with pytest.raises(KeyError):
-        fio.resolve_inflow("Q009", {"discharge_file": False}, table)
+        fio.resolve_inflow("Q009", "value", table, folder)
+    # The dictionary is needed only for constant discharges
+    (project["DISCHARGE_FILES_FOLDER"] / "discharge_dictionary.csv").unlink()
+    assert fio.read_discharge_table(folder) is None
+    assert Path(fio.resolve_inflow("Q001", "file", None, folder)["discharge_file"]).name == "Q001.txt"
+    with pytest.raises(KeyError, match="constant inflow discharge"):
+        fio.resolve_inflow("Q001", "value", None, folder)
+    assert fio.resolve_inflow("Q009", None, table, folder) is None  # no inflow to change
+
+
+def test_discharge_files_folder_default_and_deprecated(project, tmp_path, caplog):
+    assert fio.discharge_files_folder({}, project) == project["DISCHARGE_FILES_FOLDER"].resolve()
+    # Folders without the key: DISCHARGE_FILES_FOLDER of constants.py
+    without = {k: v for k, v in project.items() if k != "DISCHARGE_FILES_FOLDER"}
+    assert fio.discharge_files_folder({}, without) == Path(fio.c.DISCHARGE_FILES_FOLDER).resolve()
+    legacy = {"discharge_file": True, "discharge_file_directory": str(tmp_path / "old"), "discharge_file_list": []}
+    with caplog.at_level(logging.WARNING):
+        assert fio.discharge_files_folder(legacy, project) == (tmp_path / "old").resolve()
 
 
 def test_template_replicated_with_case_discharge(project):
@@ -126,9 +153,7 @@ def test_template_replicated_with_case_discharge(project):
     original = (template / "model.json").read_bytes()
     _ground_truth(project["GROUND_TRUTH_FOLDER"] / "A_Q002", "A_Q002")
     (case,) = fio.discover_cases(template, project["GROUND_TRUTH_FOLDER"], LOGGER)
-    inflow = fio.resolve_inflow(
-        "Q002", {"discharge_file": True, "discharge_file_directory": str(project["DISCHARGE"])}, None
-    )
+    inflow = fio.resolve_inflow("Q002", "file", None, fio.discharge_files_folder({}, project))
 
     paths = fio.setup_directories(project["OUTPUT_FOLDER"].parent, {}, LOGGER, project, case, inflow)
 
@@ -136,12 +161,17 @@ def test_template_replicated_with_case_discharge(project):
     assert run_folder == project["OUTPUT_FOLDER"] / "A_Q002" / "template_case"
     copied = json.loads((run_folder / "model.json").read_text())
     bc = copied["SETUP"]["BASEHPC"]["BASEPLANE_2D"]["HYDRAULICS"]["BOUNDARY"]["STANDARD"][0]
-    assert Path(bc["discharge_file"]) == project["DISCHARGE"] / "Q002.txt"
+    assert Path(bc["discharge_file"]) == (project["DISCHARGE_FILES_FOLDER"] / "Q002.txt").resolve()
     assert (template / "model.json").read_bytes() == original
     assert paths["folder_ground_truth"] == project["GROUND_TRUTH_FOLDER"] / "A_Q002"
 
 
 # ── Summary ──────────────────────────────────────────────────────────────────────────────────────────
+def test_discharge_codes():
+    keys = ["CASE_Q002_1.csv", "CASE_Q001_1.csv", "CASE_Q002_2.csv", "nocode.csv"]
+    assert fio.discharge_codes(keys) == ["Q002", "Q001"]
+
+
 def test_scenario_discharge_from_ground_truth():
     keys = ["CASE_Q001_1.csv", "CASE_Q001_2.csv", "CASE_Q002_1.csv"]
     assert fio.scenario_discharge_from_ground_truth(keys) == ("CASE", "Q001+Q002")
@@ -307,7 +337,6 @@ def test_parallel_queue_cpu_and_gpu(project, machine, capsys):
     for name in ("A_Q001", "B_Q002", "BAD_Q001", "C_Q001", "MISSING_Q009"):
         _ground_truth(gt / name, name)
     options = _options(1, 1)
-    options["simulation_options"] = {"discharge_file": True, "discharge_file_directory": str(project["DISCHARGE"])}
     cases = fio.discover_cases(project["SIMULATION_CONFIG_FOLDER"], gt, LOGGER)
 
     rows = batch.run(cases, options, project, runner=fake_runner)
@@ -356,7 +385,6 @@ def test_restart_skips_finished_cases(project, machine, capsys):
     (run_folder / batch.FINISHED_FILE_NAME).write_text(json.dumps(earlier))
 
     options = _options(2, 0)
-    options["simulation_options"] = {"discharge_file": True, "discharge_file_directory": str(project["DISCHARGE"])}
     cases = fio.discover_cases(project["SIMULATION_CONFIG_FOLDER"], gt, LOGGER)
 
     options["general_options"] = {"overwrite": False}

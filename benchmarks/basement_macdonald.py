@@ -463,7 +463,7 @@ def boundary_config(case: MacDonaldCase, discharge_folder: Path) -> list[dict]:
     """
     if case.regime == "subcritical":
         inflow = {"name": "inflow", "string_name": "inflow", "type": case.inflow}
-        inflow["discharge_file"] = f"../discharge/{DISCHARGE_CODE}.txt"
+        inflow["discharge_file"] = f"../discharge_files/{DISCHARGE_CODE}.txt"
         if case.inflow == "froude_in":
             inflow["froude_number"] = round(inflow_froude(case), 6)
         else:
@@ -496,7 +496,7 @@ def model_config(
     """BASEMENT 4.3 model.json of the benchmark (layout of the GUI schema / BASEHPC tutorial)."""
     case = get_case(case)
     turbulence = resolve_turbulence(case, turbulence)
-    discharge_folder = Path("discharge") if discharge_folder is None else discharge_folder
+    discharge_folder = Path("discharge_files") if discharge_folder is None else discharge_folder
     return {
         "SETUP": {
             "simulation_name": variant_name(case, turbulence),
@@ -606,22 +606,22 @@ def write_case(
     Generate the benchmark inputs in BOAR's folder layout.
 
     Args:
-        root: Folder receiving ``simulation_configs/``, ``meshes/``, ``ground_truth/``, ``support_files/`` and
-            ``discharge/`` (the inflow time series).
+        root: Folder receiving ``simulation_configs/``, ``meshes/``, ``ground_truth/`` and ``discharge_files/``
+            (the inflow time series and the discharge dictionary).
         case: Case key of ``CASES`` (or the case object).
         turbulence: Turbulence model of the variant, ``"none"`` or ``"k_epsilon"``.
         dx: Mesh cell length along the channel [m].
         ny: Number of mesh cells across the flat bottom.
 
     Returns:
-        dict: The four input folders, keyed like the constants they replace.
+        dict: The input folders, keyed like the constants they replace.
     """
     case = get_case(case)
     folders = {
         "SIMULATION_CONFIG_FOLDER": root / "simulation_configs",
         "MESH_FOLDER": root / "meshes",
         "GROUND_TRUTH_FOLDER": root / "ground_truth",
-        "SUPPORT_DATA_FOLDER": root / "support_files",
+        "DISCHARGE_FILES_FOLDER": root / "discharge_files",
     }
     for folder in folders.values():
         folder.mkdir(parents=True, exist_ok=True)
@@ -630,8 +630,7 @@ def write_case(
     shutil.rmtree(folders["MESH_FOLDER"] / "mesh_centroids", ignore_errors=True)
     write_2dm(folders["MESH_FOLDER"] / f"{CASE_NAME}.2dm", case, dx=dx, ny=ny)
 
-    discharge_folder = root / "discharge"
-    discharge_folder.mkdir(parents=True, exist_ok=True)
+    discharge_folder = folders["DISCHARGE_FILES_FOLDER"]
     (discharge_folder / f"{DISCHARGE_CODE}.txt").write_text(discharge_hydrograph(case.end_time))
     if case.regime == "supercritical":
         wse_in = float(case.bed_elevation(0.0)) + case.h_in()
@@ -650,7 +649,7 @@ def write_case(
 
     ground_truth(case).to_csv(folders["GROUND_TRUTH_FOLDER"] / f"MACDONALD_{DISCHARGE_CODE}_1.csv", index=False)
     pd.DataFrame({"Code": [DISCHARGE_CODE], "Discharge [m3/s]": [DISCHARGE]}).to_csv(
-        folders["SUPPORT_DATA_FOLDER"] / "discharge_dictionary.csv", index=False
+        folders["DISCHARGE_FILES_FOLDER"] / "discharge_dictionary.csv", index=False
     )
     return folders
 
@@ -952,16 +951,13 @@ def basement_executable(version: str = bmt.DEFAULT_BASEMENT_VERSION) -> Path:
 
 def benchmark_options(
     basement_version: str = bmt.DEFAULT_BASEMENT_VERSION,
-    inputs: Path | None = None,
     case: str | MacDonaldCase = DEFAULT_CASE,
 ) -> dict:
     """BOAR user options of the benchmark (replaces user_defined_configs/user_options.yaml)."""
-    discharge_folder = (BENCHMARK_FOLDER / "inputs" if inputs is None else inputs) / "discharge"
     regions = get_case(case).region_names
     return {
         "general_options": {"overwrite": True, "silent": True, "log_dev": False},
-        "basement_options": {"cleanup": True, "backend": "omp", "nthreads": -1, "basement_version": basement_version},
-        "simulation_options": {"discharge_file": True, "discharge_file_directory": str(discharge_folder)},
+        "basement_options": {"backend": "omp", "nthreads": -1, "basement_version": basement_version},
         "optimization_variable_options": {
             "initial_vector": "file",
             "regions": regions,
@@ -1077,7 +1073,7 @@ def run(
     mesh_path = folders["MESH_FOLDER"] / f"{CASE_NAME}.2dm"
     areas = triangle_areas(mesh_path)
     points = ground_truth(case)
-    user_opt = benchmark_options(basement_version, inputs=folder / "inputs", case=case)
+    user_opt = benchmark_options(basement_version, case=case)
     result: dict = {}
 
     with _benchmark_environment(folders, folder / "runs", make_depth_loss(areas)):
@@ -1161,7 +1157,7 @@ def write_batch_case(root: Path) -> dict[str, Path]:
     case = get_case("subcritical")
     folders = write_case(root, case, "none")
     configs = folders["SIMULATION_CONFIG_FOLDER"]
-    discharge_folder = root / "discharge"
+    discharge_folder = folders["DISCHARGE_FILES_FOLDER"]
 
     template = _start_friction(json.loads((configs / "model.json").read_text()))
     (configs / "model.json").write_text(json.dumps(template, indent=4))
@@ -1185,7 +1181,7 @@ def write_batch_case(root: Path) -> dict[str, Path]:
         target.mkdir()
         shutil.copyfile(flat, target / f"{name}_1.csv")
     flat.unlink()
-    return {**folders, "DISCHARGE": discharge_folder}
+    return folders
 
 
 def run_batch(basement_version: str = bmt.DEFAULT_BASEMENT_VERSION, gpu: bool = False) -> dict:
@@ -1224,9 +1220,9 @@ def run_batch(basement_version: str = bmt.DEFAULT_BASEMENT_VERSION, gpu: bool = 
         print(f"\n== SWASHES MacDonald batch benchmark: {label} ==", flush=True)
         output = BATCH_FOLDER / "runs" / label.split(" ")[0] / f"{n_cpu}cpu_{n_gpu}gpu"
         shutil.rmtree(output, ignore_errors=True)
-        run_folders = {**{k: v for k, v in folders.items() if k != "DISCHARGE"}, "OUTPUT_FOLDER": output}
+        run_folders = {**folders, "OUTPUT_FOLDER": output}
 
-        user_opt = benchmark_options(basement_version, inputs=BATCH_FOLDER / "inputs", case="subcritical")
+        user_opt = benchmark_options(basement_version, case="subcritical")
         user_opt["surrogate_model_options"].update(BATCH_SURROGATE)
         user_opt["batch_options"] = {"n_cpu_workers": n_cpu, "n_gpu_workers": n_gpu, "cpu_cores": -1}
 
@@ -1278,7 +1274,7 @@ RESTART_FOLDER = BATCH_FOLDER / "restart"
 
 def _batch_options(basement_version: str, n_cpu: int, overwrite: bool) -> dict:
     """Quick batch options of the subcritical benchmark."""
-    user_opt = benchmark_options(basement_version, inputs=BATCH_FOLDER / "inputs", case="subcritical")
+    user_opt = benchmark_options(basement_version, case="subcritical")
     user_opt["general_options"]["overwrite"] = overwrite
     user_opt["surrogate_model_options"].update(BATCH_SURROGATE)
     user_opt["batch_options"] = {"n_cpu_workers": n_cpu, "n_gpu_workers": 0, "cpu_cores": -1}
@@ -1302,7 +1298,7 @@ def write_batch_case_folders(root: Path) -> dict[str, Path]:
         "SIMULATION_CONFIG_FOLDER": root / "simulation_configs",
         "MESH_FOLDER": root / "meshes",
         "GROUND_TRUTH_FOLDER": root / "ground_truth",
-        "SUPPORT_DATA_FOLDER": root / "support_files",
+        "DISCHARGE_FILES_FOLDER": root / "discharge_files",
     }
 
 

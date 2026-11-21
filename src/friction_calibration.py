@@ -11,6 +11,7 @@ import logging
 import os
 import shutil
 from decimal import ROUND_HALF_UP, Decimal
+from pathlib import Path
 
 import numpy as np
 import optuna
@@ -18,7 +19,7 @@ import pandas as pd
 
 from src import basement_tools as bmt
 from src import bo_optimizer as bo
-from src import functions_sampler, utils
+from src import functions_io, functions_sampler, utils
 
 # Import user defined functions
 from user_defined_configs import function_loss as lf
@@ -207,7 +208,7 @@ class FrictionCalibration:
             "max_test_population": max_test_population,
             "max_tested_vectors": args_surrogate.get("max_tested_vectors", 100),
             ## Simulation arguments
-            "simulation_arguments": main_args["simulation_options"],
+            "simulation_arguments": main_args.get("simulation_options") or {},
         }
 
         return output
@@ -343,40 +344,16 @@ class FrictionCalibration:
             self.calibration_data["mesh"], updated_vector, target_region=regions, define_in_h5=True
         )
 
-        # Find the available discharges
-        available_discharges = dict()
-
-        for key in self.calibration_data["ground_truth_data"].keys():
-            discharge_code = key.split("_")[1]
-            idx = np.where(self.calibration_data["support_data"]["discharge_dictionary.csv"]["Code"] == discharge_code)[
-                0
-            ]
-            try:
-                discharge_value = self.calibration_data["support_data"]["discharge_dictionary.csv"].iloc[idx[0], 1]
-            except IndexError:
-                print(
-                    f"Discharge code {discharge_code} not found in support data. Please check the discharge codes in the ground truth data and the support data."
-                )
-                raise IndexError(
-                    f"Discharge code {discharge_code} not found in support data. Please check the discharge codes in the ground truth data and the support data."
-                )
-
-            available_discharges[discharge_code] = discharge_value
-
-        # Run the simulation for all discharges
+        # Run the simulation for all discharges of the ground truth
         total_validation_error = []
 
-        simulation_args = self.opt_args["simulation_arguments"]
-
-        for discharge_code, discharge_value in available_discharges.items():
-            # Defines the discharge for the simulation via file
-            if simulation_args.get("discharge_file", False):
-                discharge_file = os.path.join(simulation_args["discharge_file_directory"], f"{discharge_code}.txt")
-                self.sim_manager.define_discharge(discharge_file, file=True)
-
-            # Defines the discharge for the simulation via value
-            else:
-                self.sim_manager.define_discharge(discharge_value)
+        # Inflow of each discharge code, resolved before the first run (see main): a time series, a constant, or
+        # None when model.json has no uniform_in/froude_in inflow (its discharge is then left as it is)
+        for discharge_code, inflow in self.opt_args["inflows"].items():
+            if inflow is not None and "discharge_file" in inflow:
+                self.sim_manager.define_discharge(inflow["discharge_file"], file=True)
+            elif inflow is not None:
+                self.sim_manager.define_discharge(inflow["discharge"])
 
             self.sim_manager.run_setup(self.opt_args)
             run_status = self.sim_manager.run_simulation(self.opt_args)
@@ -577,12 +554,35 @@ def main(data: dict, paths: dict, user_opts: dict) -> dict:
     # Initialization
     folder_simulation = paths["folder_simulation"]
 
-    # Removes previous simulation results
-    if user_opts.get("basement_options", {}).get("cleanup", True):
-        utils.simulation_cleanup(folder_simulation)
+    # general_options.overwrite decides what is kept: True deletes the run folder (prepare_simulation_folder),
+    # False keeps it to resume; each simulation writes a new results.h5 anyway.
+    if "cleanup" in user_opts.get("basement_options", {}):
+        utils.write_log(
+            logger,
+            "basement_options 'cleanup' is no longer used and can be removed: general_options.overwrite decides "
+            "whether earlier results are deleted.",
+            "warning",
+        )
 
     # Creates the calibrator instance
     calibrator = FrictionCalibration(data, folder_simulation, user_opts, logger)
+    # Inflow of every discharge code of the ground truth, of the kind model.json gives (time series or constant).
+    # Resolved here, so a missing <CODE>.txt or dictionary entry stops the run before any simulation.
+    discharge_folder = paths.get("folder_discharge") or functions_io.discharge_files_folder(
+        user_opts.get("simulation_options") or {}, logger=logger
+    )
+    kind = functions_io.inflow_discharge_kind(calibrator.sim_manager._load_model_config())
+    table = data.get("discharge_table") if kind == "value" else None
+    calibrator.opt_args["inflows"] = {
+        code: functions_io.resolve_inflow(code, kind, table, discharge_folder)
+        for code in functions_io.discharge_codes(data["ground_truth_data"].keys())
+    }
+    descriptions = {
+        "file": f"time series <CODE>.txt from {discharge_folder}",
+        "value": f"constant value of <CODE> from {Path(discharge_folder) / functions_io.DISCHARGE_DICTIONARY_FILE}",
+        None: "model.json has no uniform_in/froude_in inflow, so its discharge is not changed",
+    }
+    utils.write_log(logger, f"Inflow discharge: {descriptions[kind]}; codes {list(calibrator.opt_args['inflows'])}")
 
     # Generate setup.h5 from model.json (with the initial friction written above) before the first iteration,
     # which writes friction into setup.h5. Uses the BASEMENT version set in basement_options.

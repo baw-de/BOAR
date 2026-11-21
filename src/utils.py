@@ -17,7 +17,6 @@ write_log : Log messages at different levels.
 modify_structured_array : Rename/delete columns in arrays.
 export_structured_array : Export arrays to CSV/XLSX.
 find_closest_cell : Find closest mesh cell to a point.
-simulation_cleanup : Remove simulation output files.
 create_constraint_function : Create constraint functions.
 """
 
@@ -214,24 +213,6 @@ def find_closest_cell(
         return closest_indices, distances[closest_indices]
 
     return closest_indices
-
-
-def simulation_cleanup(simulation_folder: str) -> None:
-    """
-    Clean up the simulation folder by deleting result files.
-
-    Args:
-        simulation_folder (str): Path to the simulation folder.
-
-    Returns:
-        None
-    """
-    delete_files = ["results.h5", "results_aux.h5"]
-
-    for filename in delete_files:
-        file_path = os.path.join(simulation_folder, filename)
-        if os.path.exists(file_path):
-            os.remove(file_path)
 
 
 def create_constraint_function(expr: str, variables: list):

@@ -161,8 +161,8 @@ simulation_configs/*
 !simulation_configs/.gitkeep
 meshes/*
 !meshes/.gitkeep
-support_files/*
-!support_files/.gitkeep
+discharge_files/*
+!discharge_files/.gitkeep
 output/*
 !output/.gitkeep
 benchmarks/*.txt

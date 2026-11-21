@@ -14,9 +14,8 @@ general_options:
 # BASEMENT Options
 # -----------------------------------------------------------------------------
 basement_options:
-  'cleanup': False        # [bool] Remove previous results before running
-  'backend': omp          # [str] Backend: seq, omp, cuda, cudaC, cudaO
-  'nthreads': -1          # [int] Number of cores (-1 = all available)
+  'backend': omp          # [str] Backend: seq, omp, cuda, cudaC, cudaO. Single mode: used as set. Batch mode: backend of the CPU workers (seq/omp; a GPU backend falls back to omp); GPU workers use batch_options.gpu_backend.
+  'nthreads': -1          # [int] Number of cores (-1 = all available). Single mode only; batch mode uses batch_options.cpu_cores.
   'basement_version': "4.3" # [str] BASEMENT version to run and read: "4.2" or "4.3". On Windows it also selects the install folder (C:\Program Files\BASEMENT <version>.0\bin) unless BASEMENT_PATH is set in constants.py. (Default: "4.3")
 
 # -----------------------------------------------------------------------------
@@ -27,18 +26,10 @@ batch_options:
   'n_cpu_workers': 1      # [int] Cases calibrated at the same time on the CPU, with basement_options' backend (omp/seq). (Default: 1)
   'cpu_cores': -1         # [int] Physical cores (one BASEMENT thread each) of EACH CPU run; hyperthreads are not counted. -1 = the physical cores of the machine (of each socket when pinned) shared evenly between the CPU workers. (Default: -1)
   'n_gpu_workers': 0      # [int] Cases calibrated at the same time on GPUs, spread over the cards found by nvidia-smi. (Default: 0)
-  'gpu_backend': cudaC    # [str] Backend of the GPU workers: cuda or cudaC. (Default: cudaC)
+  'gpu_backend': cudaC    # [str] Backend of the GPU workers: cuda, cudaC or cudaO. (Default: cudaC)
   'preferred_device': gpu # [str] Worker that takes the next case when a GPU and a CPU worker are both free: gpu or cpu. (Default: gpu)
   'pin_to_socket': True   # [bool] Several CPU sockets: keep each CPU run inside one socket on its own cores, and give each GPU run a core on its card's socket. No effect with one socket. Not tested on multi-socket Linux. (Default: True)
   # 'gpu_numa_nodes': [0, 1]  # [list[int]] Socket of each GPU (nvidia-smi order), only if auto-detection fails.
-
-# -----------------------------------------------------------------------------
-# Simulation Options
-# -----------------------------------------------------------------------------
-simulation_options:
-  'discharge_file': True               # [bool] Define the model setup discharge using a TXT file. (Default: False)
-  'discharge_file_directory': /path/to/discharge_files # [str] Directory containing discharge files. Only required if 'discharge_file' is True.
-  'discharge_file_list': ['Q001.txt', 'Q002.txt']  # [list] List of discharge files to use. Only required if 'discharge_file' is True.
 
 # -----------------------------------------------------------------------------
 # Optimization Options

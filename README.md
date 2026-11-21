@@ -65,7 +65,7 @@ Edit this file before running BOAR. The key sections are:
 |---------|------------------|
 | `general_options` | Logging verbosity, fresh-start flag |
 | `basement_options` | BASEMENT backend (`seq`, `omp`, `cuda`), number of CPU cores, BASEMENT version (`4.2` or `4.3`) |
-| `simulation_options` | Path to discharge input files |
+| `batch_options` | Several cases at once: CPU and GPU workers, cores per run, CPU socket pinning |
 | `optimization_variable_options` | Roughness regions, parameter bounds, constraint expressions |
 | `sampling_options` | Number of Latin Hypercube samples, random seed |
 | `surrogate_model_options` | GPR iterations, stopping tolerances, max evaluations |

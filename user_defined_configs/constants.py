@@ -19,8 +19,11 @@ SIMULATION_NAME_KEY : str
     Key in the SETUP section of model.json (BASEMENT's own ``simulation_name``) that names the output folder.
 MESH_FOLDER : pathlib.Path
     Directory containing mesh input files.
-SUPPORT_DATA_FOLDER : pathlib.Path
-    Directory containing supplementary support data files.
+DISCHARGE_FILES_FOLDER : pathlib.Path
+    Directory holding the discharges of the ground-truth codes (``CASE_Q001_1.csv`` -> ``Q001``): the time series
+    ``<CODE>.txt`` (e.g. ``Q001.txt``), used when the inflow boundary of model.json has a ``discharge_file``, and
+    ``discharge_dictionary.csv`` (columns ``Code`` and the discharge value), needed only when it has a constant
+    ``discharge``.
 GROUND_TRUTH_FOLDER : pathlib.Path
     Directory containing reference/validation ground-truth data. CSV files directly in it: one calibration
     (single mode). Subfolders ``SCENARIO_DISCHARGE/``: one calibration each (batch mode), configured by
@@ -43,5 +46,5 @@ OUTPUT_FOLDER = PROJECT_ROOT / "output"
 # Read from model.json: {"SETUP": {"simulation_name": "my_case", ...}} -> OUTPUT_FOLDER / "my_case"
 SIMULATION_NAME_KEY = "simulation_name"
 MESH_FOLDER = PROJECT_ROOT / "meshes"
-SUPPORT_DATA_FOLDER = PROJECT_ROOT / "support_files"
+DISCHARGE_FILES_FOLDER = PROJECT_ROOT / "discharge_files"
 GROUND_TRUTH_FOLDER = PROJECT_ROOT / "ground_truth"

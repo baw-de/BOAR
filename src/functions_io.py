@@ -27,7 +27,7 @@ MeshData = dict[str, np.ndarray | dict[str, np.ndarray] | None]
 SIMULATION_CONFIG_FILES = ("model.json", "simulation.json", "results.json")
 # Inflow boundaries whose discharge BOAR sets (template replication in batch mode and every evaluation)
 INFLOW_BOUNDARY_TYPES = ("froude_in", "uniform_in")
-# Lookup table (Code, discharge value) in SUPPORT_DATA_FOLDER
+# Lookup table (Code, discharge value) in DISCHARGE_FILES_FOLDER, needed for inflows with a constant discharge
 DISCHARGE_DICTIONARY_FILE = "discharge_dictionary.csv"
 
 
@@ -72,7 +72,7 @@ def default_folders() -> dict[str, Path]:
         "GROUND_TRUTH_FOLDER": Path(c.GROUND_TRUTH_FOLDER),
         "OUTPUT_FOLDER": Path(c.OUTPUT_FOLDER),
         "MESH_FOLDER": Path(c.MESH_FOLDER),
-        "SUPPORT_DATA_FOLDER": Path(c.SUPPORT_DATA_FOLDER),
+        "DISCHARGE_FILES_FOLDER": Path(c.DISCHARGE_FILES_FOLDER),
     }
 
 
@@ -333,7 +333,6 @@ def setup_directories(
     folder_mesh = folders["MESH_FOLDER"]
     folder_centroids = os.path.join(folder_mesh, "mesh_centroids")
     folder_output = folders["OUTPUT_FOLDER"]
-    folder_support = folders["SUPPORT_DATA_FOLDER"]
     folder_ground_truth = case.ground_truth_folder if case is not None else folders["GROUND_TRUTH_FOLDER"]
     folder_configs = case.config_folder if case is not None else folders["SIMULATION_CONFIG_FOLDER"]
 
@@ -351,13 +350,7 @@ def setup_directories(
     output_root = Path(folder_output) / case.name if case is not None and case.name else Path(folder_output)
     folder_simulation = prepare_simulation_folder(folder_configs, output_root, overwrite, logger, inflow=inflow)
 
-    if folder_support is None or not os.path.exists(folder_support):
-        logger.error(
-            "Support data folder not specified. The inclusion of a lookup table containing (discharge_code, discharge_value) is required."
-        )
-        raise ValueError(
-            "Support data folder not specified. The inclusion of a lookup table containing (discharge_code, discharge_value) is required."
-        )
+    folder_discharge = discharge_files_folder(user_options.get("simulation_options") or {}, folders, logger)
 
     return {
         "path_project": project_path,
@@ -367,7 +360,7 @@ def setup_directories(
         "folder_mesh": folder_mesh,
         "folder_centroids": folder_centroids,
         "folder_output": folder_output,
-        "folder_support": folder_support,
+        "folder_discharge": folder_discharge,
     }
 
 
@@ -395,7 +388,7 @@ def main(paths: dict) -> dict:
     logger.debug("Importing data")
 
     # Creates the data holding structure
-    output = dict()
+    output: dict = {}
 
     # Reads the meshes
     output["mesh"] = find_available_meshes(paths)
@@ -403,9 +396,8 @@ def main(paths: dict) -> dict:
     # Reads ground truth data
     output["ground_truth_data"] = read_csv_files_in_folder(paths["folder_ground_truth"])
 
-    # Reads the discharge data if existing
-    if os.path.exists(paths["folder_support"]):
-        output["support_data"] = read_csv_files_in_folder(paths["folder_support"])
+    # Reads the discharge dictionary if existing (needed only for inflows with a constant discharge)
+    output["discharge_table"] = read_discharge_table(paths["folder_discharge"])
 
     logger.info("Data imported")
 
@@ -443,37 +435,117 @@ def set_inflow_discharge(model_config: dict, discharge_file: str | None = None, 
     return found
 
 
-def read_discharge_table(folder_support: str | Path) -> pd.DataFrame | None:
-    """The discharge dictionary (Code, value) of the support folder, or None if it does not exist."""
-    path = Path(folder_support) / DISCHARGE_DICTIONARY_FILE
+def read_discharge_table(folder_discharge: str | Path) -> pd.DataFrame | None:
+    """The discharge dictionary (Code, value) of the discharge folder, or None if it does not exist."""
+    path = Path(folder_discharge) / DISCHARGE_DICTIONARY_FILE
     return pd.read_csv(path) if path.is_file() else None
 
 
-def resolve_inflow(discharge_code: str, simulation_options: dict, discharge_table: pd.DataFrame | None) -> dict:
+_warned_legacy_directory = False
+_warned_legacy_list = False
+
+
+def discharge_files_folder(
+    simulation_options: dict, folders: dict | None = None, logger: logging.Logger = logger
+) -> Path:
+    """
+    Folder of the discharges: ``DISCHARGE_FILES_FOLDER`` (discharge_files/, with ``<CODE>.txt`` and the dictionary).
+
+    The deprecated ``simulation_options.discharge_file_directory`` still overrides it, with a warning; a
+    relative path is read from the project root.
+
+    Args:
+        simulation_options: ``simulation_options`` of the user options.
+        folders: Project folders (see :func:`default_folders`); default: read from constants.py.
+        logger: Logger for the deprecation warning.
+
+    Returns:
+        Path: The absolute folder.
+    """
+    global _warned_legacy_directory, _warned_legacy_list
+    unused = [key for key in ("discharge_file", "discharge_file_list") if key in simulation_options]
+    if unused and not _warned_legacy_list:
+        logger.warning(
+            f"simulation_options {unused} are no longer used and can be removed: the discharge codes come from "
+            "the ground-truth file names (CASE_<CODE>_*.csv), and the inflow boundary of model.json tells whether "
+            "the discharge is a time series (discharge_file) or a constant (discharge)."
+        )
+        _warned_legacy_list = True
+    legacy = simulation_options.get("discharge_file_directory")
+    if legacy not in (None, "", "None"):
+        directory = Path(str(legacy))
+        directory = directory if directory.is_absolute() else Path(c.PROJECT_ROOT) / directory
+        if not _warned_legacy_directory:
+            logger.warning(
+                "simulation_options 'discharge_file_directory' is deprecated: put the discharge files in "
+                f"discharge_files/ (DISCHARGE_FILES_FOLDER in constants.py). Using {directory}."
+            )
+            _warned_legacy_directory = True
+        return directory.resolve()
+
+    folders = folders or default_folders()
+    return Path(folders.get("DISCHARGE_FILES_FOLDER") or c.DISCHARGE_FILES_FOLDER).resolve()
+
+
+def inflow_discharge_kind(model_config: dict) -> str | None:
+    """
+    How model.json gives the discharge of its inflow boundaries (``froude_in``, ``uniform_in``).
+
+    Returns:
+        ``"file"`` when they hold a ``discharge_file`` (time series), ``"value"`` when they hold a constant
+        ``discharge``, or None when model.json has no such inflow boundary (BOAR then leaves the discharge as it is).
+    """
+    try:
+        boundaries = model_config["SETUP"]["BASEHPC"]["BASEPLANE_2D"]["HYDRAULICS"]["BOUNDARY"]["STANDARD"]
+    except (KeyError, TypeError):
+        return None
+    inflows = [bc for bc in boundaries if isinstance(bc, dict) and bc.get("type") in INFLOW_BOUNDARY_TYPES]
+    if any("discharge_file" in bc for bc in inflows):
+        return "file"
+    if any("discharge" in bc for bc in inflows):
+        return "value"
+    return None
+
+
+def read_inflow_discharge_kind(config_folder: str | Path) -> str | None:
+    """:func:`inflow_discharge_kind` of ``config_folder/model.json`` (None if it cannot be read)."""
+    try:
+        with open(Path(config_folder) / "model.json") as f:
+            return inflow_discharge_kind(json.load(f))
+    except (OSError, ValueError):
+        return None
+
+
+def resolve_inflow(
+    discharge_code: str, kind: str | None, discharge_table: pd.DataFrame | None, discharge_folder: Path
+) -> dict | None:
     """
     The inflow discharge of a discharge code, as BOAR's calibration sets it.
 
-    With ``simulation_options.discharge_file`` the time series ``<discharge_file_directory>/<code>.txt`` is used,
-    otherwise the value of the code in the discharge dictionary.
+    ``kind`` comes from model.json (see :func:`inflow_discharge_kind`): ``"file"`` uses the time series
+    ``<discharge_folder>/<code>.txt`` (see :func:`discharge_files_folder`), ``"value"`` the value of the code in
+    the discharge dictionary, and None leaves the discharge of model.json unchanged (returns None).
 
     Returns:
-        dict: ``{"discharge_file": absolute path}`` or ``{"discharge": value}``.
+        dict | None: ``{"discharge_file": absolute path}``, ``{"discharge": value}`` or None.
 
     Raises:
         FileNotFoundError: The discharge file does not exist.
         KeyError: The code is not in the discharge dictionary.
     """
-    if simulation_options.get("discharge_file", False):
-        directory = Path(str(simulation_options.get("discharge_file_directory", "")))
-        if not directory.is_absolute():
-            directory = Path(c.PROJECT_ROOT) / directory
-        path = (directory / f"{discharge_code}.txt").resolve()
+    if kind is None:
+        return None
+    if kind == "file":
+        path = (Path(discharge_folder) / f"{discharge_code}.txt").resolve()
         if not path.is_file():
-            raise FileNotFoundError(f"Discharge file {path} not found (simulation_options.discharge_file_directory).")
+            raise FileNotFoundError(f"Discharge file {path} not found.")
         return {"discharge_file": str(path)}
 
     if discharge_table is None:
-        raise KeyError(f"No {DISCHARGE_DICTIONARY_FILE} in the support folder to look up {discharge_code}.")
+        raise KeyError(
+            f"model.json gives a constant inflow discharge, so {Path(discharge_folder) / DISCHARGE_DICTIONARY_FILE} "
+            f"(columns Code and the discharge value) is needed to look up {discharge_code}."
+        )
     match = discharge_table[discharge_table["Code"].astype(str) == str(discharge_code)]
     if match.empty:
         raise KeyError(f"Discharge code {discharge_code} not found in {DISCHARGE_DICTIONARY_FILE}.")
@@ -557,6 +629,16 @@ def discover_cases(config_root: str | Path, ground_truth_root: str | Path, logge
         if (extra / "model.json").is_file() and extra.name not in names:
             logger.warning(f"simulation_configs/{extra.name}/ has no ground_truth/{extra.name}/ and is skipped.")
     return cases
+
+
+def discharge_codes(keys) -> list[str]:
+    """Discharge codes of ground-truth file names ``CASE_<CODE>_*.csv``, in order of appearance."""
+    codes: list[str] = []
+    for key in keys:
+        parts = Path(key).stem.split("_")
+        if len(parts) > 1 and parts[1] not in codes:
+            codes.append(parts[1])
+    return codes
 
 
 def scenario_discharge_from_ground_truth(keys) -> tuple[str, str]:

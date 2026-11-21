@@ -176,7 +176,7 @@ class TestCaseFiles:
         assert inflow["type"] == "uniform_in" and outflow["type"] == "zhydrograph"
         assert outflow["wse"] == pytest.approx(bm.h_out())  # z(L) = 0
 
-        hydrograph = np.loadtxt(tmp_path / "inputs" / "discharge" / f"{bm.DISCHARGE_CODE}.txt", delimiter=",")
+        hydrograph = np.loadtxt(tmp_path / "inputs" / "discharge_files" / f"{bm.DISCHARGE_CODE}.txt", delimiter=",")
         assert hydrograph[0].tolist() == [0.0, 0.0] and hydrograph[1, 1] == bm.DISCHARGE
 
         gt = pd.read_csv(folders["GROUND_TRUTH_FOLDER"] / f"MACDONALD_{bm.DISCHARGE_CODE}_1.csv")

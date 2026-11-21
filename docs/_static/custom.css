@@ -1,0 +1,11 @@
+/* Let table cells wrap: the Read the Docs theme keeps each cell on one line, so long cells widen the table
+   beyond the page. Line breaks written in the source (line blocks) are kept. */
+.wy-table-responsive table td,
+.wy-table-responsive table th {
+    white-space: normal;
+}
+
+/* Wide display equations scroll inside their box instead of overflowing the page. */
+div.math {
+    overflow-x: auto;
+}

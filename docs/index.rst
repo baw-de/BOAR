@@ -20,6 +20,7 @@ functions.
    optimization_configuration
    loss_function
    benchmarks
+   benchmarks_swe
    source/modules
 
 

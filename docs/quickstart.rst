@@ -11,6 +11,21 @@ Make sure you have followed the installation instructions in the
 setting up a Python environment, installing dependencies, and verifying the
 installation.
 
+Testing your setup
+------------------
+
+To check that BOAR and BASEMENT 4.3 work together on your machine before preparing your own case, run the
+light BASEMENT benchmark with an analytical solution (a few minutes; see
+:doc:`Shallow-Water Benchmarks </benchmarks_swe>`):
+
+.. code-block:: bash
+
+    uv run python benchmarks/basement_macdonald.py
+
+It generates its own mesh, configuration and ground truth under ``output/benchmarks/swashes_macdonald/``,
+calibrates the Manning coefficients of its friction regions and prints ``PASS`` when the final water depth
+matches the analytical one.
+
 
 Configuring BOAR
 -----------------

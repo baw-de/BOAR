@@ -18,6 +18,8 @@ import sys
 sys.path.insert(0, os.path.abspath("../"))
 sys.path.insert(0, os.path.abspath("../src"))
 sys.path.insert(0, os.path.abspath("../user_defined_configs"))
+# Benchmark modules, imported by name in tests (as pytest's pythonpath = [".", "benchmarks"])
+sys.path.insert(0, os.path.abspath("../benchmarks"))
 
 # Test import
 try:
@@ -46,6 +48,7 @@ templates_path = ["_templates"]
 exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 html_theme = "sphinx_rtd_theme"
 html_static_path = ["_static"]
+html_css_files = ["custom.css"]  # table cells wrap, wide equations scroll
 
 # Mock heavy C-extension / optional dependencies that are not available
 # in the documentation build environment (sphinx-build runs without GPU libs).

@@ -21,7 +21,7 @@ Example:
     >>> python boar.py --log-file custom_log.log
 """
 
-__version__ = "BOAR v.1.0.0"
+__version__ = "BOAR v.1.1.0"
 
 # Standard library imports
 import argparse

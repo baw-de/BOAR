@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "boar"
-version = "1.0.0"
+version = "1.1.0"
 description = "Bayesian Optimization for Automated Roughness calibration in 2D hydrodynamic models"
 readme = "README.md"
 license = { text = "GPLv3" }

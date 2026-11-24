@@ -9,7 +9,7 @@
 project = "BOAR"
 copyright = "de Oliveira et al. (2026)"
 author = "LED. de Oliveira, MJ. Franca, NP. Huber, D. Vanzo"
-release = "1.0.0"
+release = "1.1.0"
 
 # -- Creates the auto-documentation -------------------------------------------
 import os

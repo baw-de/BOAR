@@ -20,16 +20,6 @@ runs:
         cache-dependency-glob: "uv.lock"
         activate-environment: true
 
-    # h5py publishes no cp315 wheels yet, so on 3.15 uv builds it from source
-    # and needs the HDF5 headers. Remove this step once cp315 wheels exist.
-    - name: Install HDF5 headers (3.15 only)
-      if: inputs.python-version == '3.15'
-      shell: bash
-      run: |
-        sudo apt-get update -q
-        sudo apt-get install -y -q libhdf5-dev pkg-config
-        echo "HDF5_DIR=/usr/lib/x86_64-linux-gnu/hdf5/serial" >> "$GITHUB_ENV"
-
     # --locked fails if uv.lock is out of date with pyproject.toml.
     - name: Install dependencies
       shell: bash

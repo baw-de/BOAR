@@ -126,7 +126,7 @@ jobs:
     strategy:
       fail-fast: false                       # let all versions run even if one fails
       matrix:
-        python-version: ["3.11", "3.12", "3.13", "3.14", "3.15"]
+        python-version: ["3.11", "3.12", "3.13", "3.14"]
     name: test (py${{ matrix.python-version }})
     steps:
       - uses: actions/checkout@v7

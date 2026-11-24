@@ -7,7 +7,7 @@ installs the pinned versions of ``uv.lock``, or with pip.
 
 Prerequisites
 --------------
-BOAR needs Python 3.11 or higher. For the default setup, also install uv
+BOAR needs Python 3.11 to 3.14 (h5py publishes no wheels for 3.15 yet). For the default setup, also install uv
 (see the `uv installation guide <https://docs.astral.sh/uv/getting-started/installation/>`_); it downloads
 a suitable Python itself if none is installed.
 

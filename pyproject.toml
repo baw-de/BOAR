@@ -10,7 +10,7 @@ version = "1.0.0"
 description = "Bayesian Optimization for Automated Roughness calibration in 2D hydrodynamic models"
 readme = "README.md"
 license = { text = "GPLv3" }
-requires-python = ">=3.11"
+requires-python = ">=3.11,<3.15"   # h5py has no cp315 wheels yet; raise the cap once it does
 dependencies = [
     "h5py>=3.11.0",
     "numpy>=2.3.0",

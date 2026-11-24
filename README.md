@@ -28,7 +28,7 @@ BOAR can be used for:
 
 ## Installation
 
-BOAR requires **Python ≥ 3.11** and a working installation of **BASEMENT v4.3** or **v4.2** (set `basement_version` in `basement_options` to match; default `"4.3"`). The dependencies are listed in `pyproject.toml`. BOAR runs from the project folder in a virtual environment `.venv`, set up either with [uv](https://docs.astral.sh/uv/getting-started/installation/) (default; uses the pinned versions in `uv.lock` and downloads a suitable Python if needed) or with pip.
+BOAR requires **Python 3.11–3.14** and a working installation of **BASEMENT v4.3** or **v4.2** (set `basement_version` in `basement_options` to match; default `"4.3"`). The dependencies are listed in `pyproject.toml`. BOAR runs from the project folder in a virtual environment `.venv`, set up either with [uv](https://docs.astral.sh/uv/getting-started/installation/) (default; uses the pinned versions in `uv.lock` and downloads a suitable Python if needed) or with pip.
 
 ```bash
 # 1. Clone the repository

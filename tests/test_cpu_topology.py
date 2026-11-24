@@ -1,7 +1,7 @@
 """
 Socket detection, core and GPU allocation and the pinned launch of src/cpu_topology.py.
 
-Taken from capiQ 0.1.0 (https://github.com/KIT-IWU-HydroEng/capiQ, tests/test_cpu_topology.py),
+Taken from capiQ 0.2.0 (https://github.com/KIT-IWU-HydroEng/capiQ, tests/test_cpu_topology.py),
 Copyright (c) 2026 Karlsruhe Institute of Technology (KIT), MIT License: see THIRD_PARTY_NOTICES.md. The tests
 of capiQ's own queue and logs are left out. No BASEMENT or multi-socket machine is needed.
 """

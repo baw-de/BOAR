@@ -3,7 +3,7 @@
 # Copyright 2026, Copyright Owner: Karlsruhe Institute of Technology (KIT)
 # Author: Luiz Oliveira
 # Contact: luiz.oliveira@kit.edu, Institute for Water and Environment (IWU)
-# Taken from capiQ 0.1.0 (https://github.com/KIT-IWU-HydroEng/capiQ, src/capiq/cpu_topology.py), MIT License:
+# Taken from capiQ 0.2.0 (https://github.com/KIT-IWU-HydroEng/capiQ, src/capiq/cpu_topology.py), MIT License:
 # see THIRD_PARTY_NOTICES.md for the license text. Only the imports of report() are adapted to BOAR.
 
 """

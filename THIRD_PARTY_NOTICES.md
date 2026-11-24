@@ -5,8 +5,9 @@ project below, under its own license.
 
 ## capiQ
 
-- Project: capiQ: Computational Automation Pipeline for Hydro-morphodynamic simulation Queues, version 0.1.0
+- Project: capiQ: Computational Automation Pipeline for Hydro-morphodynamic simulation Queues, version 0.2.0
 - Repository: https://github.com/KIT-IWU-HydroEng/capiQ
+- DOI: https://doi.org/10.5281/zenodo.24505638
 - Copyright (c) 2026 Karlsruhe Institute of Technology (KIT)
 - License: MIT (text below)
 

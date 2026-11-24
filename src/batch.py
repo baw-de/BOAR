@@ -11,7 +11,7 @@ on a machine with several CPU sockets each CPU run stays inside one socket on it
 GPU run gets its own card plus one core on the card's socket. Every finished case adds a row to
 ``output/calibration_summary.csv``; a failed case is logged, marked ``failed`` and the queue goes on.
 
-The parallel queue, ``choose_device`` and ``kill_process_trees`` are adapted from capiQ 0.1.0
+The parallel queue, ``choose_device`` and ``kill_process_trees`` are adapted from capiQ 0.2.0
 (https://github.com/KIT-IWU-HydroEng/capiQ, src/capiq/calculate_sim_queue.py and src/capiq/utils.py),
 Copyright (c) 2026 Karlsruhe Institute of Technology (KIT), MIT License: see THIRD_PARTY_NOTICES.md.
 """

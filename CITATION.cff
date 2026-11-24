@@ -58,5 +58,10 @@ references:
         affiliation: "Institute for Water and Environment (IWU), Karlsruhe Institute of Technology (KIT)"
         orcid: "https://orcid.org/0000-0002-5734-8337"
     repository-code: "https://github.com/KIT-IWU-HydroEng/capiQ"
-    version: 0.1.0
+    version: 0.2.0
+    date-released: 2026-11-24
+    doi: "10.5281/zenodo.24505638"
+    url: "https://zenodo.org/records/24505638"
+    publisher:
+      name: "Zenodo"
     license: MIT

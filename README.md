@@ -139,14 +139,6 @@ If you use BOAR in your research, please cite:
 
 On GitHub, click **Cite this repository** in the right-hand sidebar to copy this reference in APA or BibTeX format (generated from [CITATION.cff](CITATION.cff)).
 
-## Acknowledgements
-
-The placement of parallel batch runs on CPU sockets and GPUs (`src/cpu_topology.py`) and parts of the batch
-queue (`src/batch.py`) come from [capiQ](https://github.com/KIT-IWU-HydroEng/capiQ) (de Oliveira, L.E.D.,
-Franca, M.J., Vanzo, D. (2026). capiQ: Computational Automation Pipeline for Hydro-morphodynamic simulation Queues
-(Version 0.2.0) [Computer software]. Zenodo. [https://doi.org/10.5281/zenodo.24505638](https://doi.org/10.5281/zenodo.24505638)), under the
-MIT License. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
-
 ## Contributing
 
 Contributions are welcome — see [`CONTRIBUTING.md`](CONTRIBUTING.md) for the full guide (Gitflow, coding standards, tests). Suggested contributions include:
@@ -161,7 +153,15 @@ Contributions are welcome — see [`CONTRIBUTING.md`](CONTRIBUTING.md) for the f
 
 Currently BOAR only supports:
 
-- BASEMENT v4.2 [[1]](#1)[[2]](#2)
+- BASEMENT v4.2 and v4.3 [[1]](#1)[[2]](#2)
+
+## Acknowledgements
+
+The placement of parallel batch runs on CPU sockets and GPUs (`src/cpu_topology.py`) and parts of the batch
+queue (`src/batch.py`) come from [capiQ](https://github.com/KIT-IWU-HydroEng/capiQ) (de Oliveira, L.E.D.,
+Franca, M.J., Vanzo, D. (2026). capiQ: Computational Automation Pipeline for Hydro-morphodynamic simulation Queues
+(Version 0.2.0) [Computer software]. Zenodo. [https://doi.org/10.5281/zenodo.24505638](https://doi.org/10.5281/zenodo.24505638)), under the
+MIT License. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 ## References
 

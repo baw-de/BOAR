@@ -53,14 +53,26 @@ references:
   - type: software
     title: "capiQ: Computational Automation Pipeline for Hydro-morphodynamic simulation Queues"
     authors:
-      - family-names: "Oliveira"
-        given-names: "Luiz"
-        affiliation: "Institute for Water and Environment (IWU), Karlsruhe Institute of Technology (KIT)"
+      - family-names: "de Oliveira"
+        given-names: "Luiz E.D."
+        affiliation: "Institute for Water and Environment (IWU), Karlsruhe Institute of Technology (KIT); Department of Geosciences - Eberhard Karls University of Tübingen (UT), Tübingen, Germany"
         orcid: "https://orcid.org/0000-0002-5734-8337"
+      - family-names: "Franca"
+        given-names: "Mário J."
+        affiliation: "Institute for Water and Environment (IWU), Karlsruhe Institute of Technology (KIT)"
+        orcid: "https://orcid.org/0000-0002-0265-8581"
+      - family-names: "Vanzo"
+        given-names: "Davide"
+        affiliation: "Institute for Water and Environment (IWU), Karlsruhe Institute of Technology (KIT)"
+        orcid: "https://orcid.org/0000-0002-2033-9197"
     repository-code: "https://github.com/KIT-IWU-HydroEng/capiQ"
     version: 0.2.0
     date-released: 2026-11-24
-    doi: "10.5281/zenodo.24505638"
+    doi: "10.5281/zenodo.24505638"  # version 0.2.0 (the code BOAR includes)
+    identifiers:
+      - type: doi
+        value: "10.5281/zenodo.24505637"
+        description: "Concept DOI: all versions, resolves to the latest release"
     url: "https://zenodo.org/records/24505638"
     publisher:
       name: "Zenodo"

@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
 # Copyright 2026, Copyright Owner: Karlsruhe Institute of Technology (KIT)
-# Author: Luiz Oliveira
+# Authors: Luiz E.D. de Oliveira, Mário J. Franca, Davide Vanzo
 # Contact: luiz.oliveira@kit.edu, Institute for Water and Environment (IWU)
+# DOI: https://doi.org/10.5281/zenodo.24505637
 # Taken from capiQ 0.2.0 (https://github.com/KIT-IWU-HydroEng/capiQ, src/capiq/cpu_topology.py), MIT License:
 # see THIRD_PARTY_NOTICES.md for the license text. Only the imports of report() are adapted to BOAR.
 

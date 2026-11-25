@@ -1,8 +1,12 @@
 # BOAR: Bayesian Optimization for Automated Roughness calibration in two-dimensional hydrodynamic models
 
-**Documentation** — build locally with Sphinx (see [Building the docs](#building-the-docs) below) · Quickstart · Installation · Configuration · API Reference
-
-Also available at: https://baw-de.github.io/BOAR/
+<p align="center">
+  <a href="https://github.com/baw-de/BOAR/actions/workflows/ci.yml"><img src="https://github.com/baw-de/BOAR/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"></a>
+  <a href="pyproject.toml"><img src="https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13%20%7C%203.14-blue" alt="Python 3.11 to 3.14"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/baw-de/BOAR" alt="License: GPL v3"></a>
+  <a href="https://github.com/baw-de/BOAR/commits"><img src="https://img.shields.io/github/last-commit/baw-de/BOAR" alt="Last commit"></a>
+  <a href="https://doi.org/10.1016/j.softx.2026.102899"><img src="https://img.shields.io/badge/DOI-10.1016%2Fj.softx.2026.102899-blue" alt="DOI"></a>
+</p>
 
 BOAR is a tool for automating the calibration of roughness parameters in two-dimensional hydrodynamic models using Bayesian Optimization. The project is designed to reduce manual trial-and-error during model calibration and support more efficient, reproducible parameter estimation workflows.
 
@@ -11,6 +15,8 @@ BOAR is a tool for automating the calibration of roughness parameters in two-dim
 Calibrating hydraulic roughness parameters is a critical step in two-dimensional hydrodynamic modeling. Traditional calibration approaches often require repeated simulations, manual parameter tuning, and expert judgment. BOAR addresses this challenge by coupling hydrodynamic model evaluation with Bayesian Optimization to search for roughness values that improve agreement between simulations and reference observations.
 
 The repository is intended for users working with computational hydraulics, model calibration, uncertainty-aware parameter tuning, and automated simulation workflows.
+
+Documentation available at https://baw-de.github.io/BOAR/ or built locally with Sphinx (see [Building the docs](#building-the-docs) below)
 
 ## Features
 
